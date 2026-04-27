@@ -14,7 +14,9 @@ import type {
 const WAIT_MESSAGE =
   "Vui lòng chờ vài phút, technical team đang kiểm tra và sẽ phản hồi bạn sớm nhất.";
 
-const MISSING_FIELD_LABEL: Record<string, string> = {
+type MissingField = "screenshot" | "editor_link" | "ticket_url";
+
+const MISSING_FIELD_LABEL: Record<MissingField, string> = {
   screenshot: "hình ảnh (screenshot)",
   editor_link: "link editor",
   ticket_url: "ticket URL",
@@ -27,7 +29,7 @@ const MISSING_FIELD_LABEL: Record<string, string> = {
 function diagnosizeScrollIssueHandler(
   input: DiagnosizeScrollInput
 ): DiagnosizeScrollOutput {
-  const missing: string[] = [];
+  const missing: MissingField[] = [];
 
   if (!input.has_screenshot) missing.push("screenshot");
   if (!input.editor_link) missing.push("editor_link");
@@ -35,7 +37,7 @@ function diagnosizeScrollIssueHandler(
 
   if (missing.length > 0) {
     const labels = missing
-      .map((key) => MISSING_FIELD_LABEL[key] ?? key)
+      .map((key) => MISSING_FIELD_LABEL[key])
       .join(", ");
 
     return {

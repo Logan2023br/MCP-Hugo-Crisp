@@ -64,7 +64,7 @@ const DIAGNOSE_SCROLL_OUTPUT_SHAPE = z.object({
   is_ready_for_escalation: z
     .boolean()
     .describe(
-      "True only when has_screenshot is true AND editor_link AND ticket_url are present."
+      "True iff has_screenshot is true. (editor_link and ticket_url are required by the input schema, so their presence is enforced before the handler runs.)"
     ),
 
   missing_info: z
