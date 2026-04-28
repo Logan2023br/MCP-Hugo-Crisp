@@ -114,11 +114,21 @@ async function postCrispPrivateNote(
   }
 }
 
-// Race-prone fallback: when Hugo does not pass crisp_session_id, list the
-// most recently active conversation in this website and assume it is the
-// one Hugo is replying to. Acceptable for single-tester demos; in
-// production we would expect Crisp to expose the session ID via the MCP
-// request context, or rely on a webhook-driven mapping.
+// Race-prone fallback: when Hugo does not pass crisp_session_id, infer it
+// by looking at recent conversations in this workspace. We narrow to the
+// conversation whose LAST message is from a visitor (not an operator) —
+// because at the moment Hugo calls this tool, the conversation it is
+// replying to has the user's message as its most recent entry. This still
+// fails if multiple visitors message at the same instant; in production
+// we expect Crisp to expose the session ID via the MCP request context.
+interface ConversationLite {
+  session_id?: string;
+  last_message?: {
+    timestamp?: number;
+    from?: string; // "user" | "operator" | ...
+  };
+}
+
 async function findLatestActiveSession(
   creds: CrispCreds
 ): Promise<{ sessionId: string | null; error?: string }> {
@@ -139,18 +149,31 @@ async function findLatestActiveSession(
       };
     }
     const json = (await response.json()) as { data?: unknown };
-    const items = Array.isArray(json.data) ? (json.data as Array<Record<string, unknown>>) : [];
+    const items = Array.isArray(json.data) ? (json.data as ConversationLite[]) : [];
     if (items.length === 0) {
       return { sessionId: null, error: "No conversations returned by Crisp." };
     }
-    items.sort((a, b) => {
-      const ta = (a.last_message as Record<string, unknown> | undefined)?.timestamp as number | undefined;
-      const tb = (b.last_message as Record<string, unknown> | undefined)?.timestamp as number | undefined;
-      return (tb ?? 0) - (ta ?? 0);
-    });
-    const sessionId = items[0]?.session_id as string | undefined;
+
+    // Sort all by recency.
+    const byRecency = [...items].sort(
+      (a, b) => (b.last_message?.timestamp ?? 0) - (a.last_message?.timestamp ?? 0)
+    );
+
+    // Prefer conversations where the very last message is from the visitor —
+    // that's the one Hugo is currently replying to.
+    const userLast = byRecency.find((c) => c.last_message?.from === "user");
+    const chosen = userLast ?? byRecency[0];
+
+    const sessionId = chosen.session_id;
     if (!sessionId) {
       return { sessionId: null, error: "Top conversation has no session_id field." };
+    }
+    if (!userLast) {
+      return {
+        sessionId,
+        error:
+          "Warning: no conversation had last_message.from === 'user'. Falling back to most-recently-active conversation; this may be the wrong one if multiple visitors are active.",
+      };
     }
     return { sessionId };
   } catch (err) {
