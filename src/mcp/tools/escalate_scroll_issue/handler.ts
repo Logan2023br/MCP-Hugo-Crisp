@@ -23,6 +23,30 @@ const MISSING_FIELD_LABEL: Record<MissingField, string> = {
 
 const TICKET_URL_FALLBACK = "(unknown — tool was called without ticket_url)";
 
+const PLACEHOLDER_PATTERNS: RegExp[] = [
+  /YOUR_STORE/i,
+  /YOUR_SHOP/i,
+  /YOUR_DOMAIN/i,
+  /STORE_NAME/i,
+  /SHOP_NAME/i,
+  /PAGE_ID/i,
+  /<[^<>]+>/, // angle-bracket placeholders like <store_name>
+  /\{[^{}]+\}/, // curly-brace placeholders like {store_name}
+  /dummyimage\.com/i,
+  /placehold(er|it|\.co)/i,
+  /\bexample\.(com|org|net)\b/i,
+  /\bfake[-_/]/i,
+  /\bsample[-_/]/i,
+  /\btest[-_/]?(image|url|store|page)\b/i,
+  /lorempixel/i,
+  /loremipsum/i,
+];
+
+function looksLikePlaceholder(url: string | undefined): boolean {
+  if (!url) return false;
+  return PLACEHOLDER_PATTERNS.some((re) => re.test(url));
+}
+
 /**************************************************************************
  * CRISP API CLIENT
  ***************************************************************************/
@@ -94,6 +118,16 @@ async function escalateScrollIssueHandler(
   if (!input.screenshot_url) missing.push("screenshot");
   if (!input.editor_link) missing.push("editor_link");
 
+  // Reject obvious placeholders / fabricated URLs. Hugo sometimes invents
+  // values like "YOUR_STORE", "PAGE_ID", "dummyimage.com" to satisfy the
+  // schema instead of asking the user. Treat these as "missing".
+  if (input.screenshot_url && looksLikePlaceholder(input.screenshot_url)) {
+    if (!missing.includes("screenshot")) missing.push("screenshot");
+  }
+  if (input.editor_link && looksLikePlaceholder(input.editor_link)) {
+    if (!missing.includes("editor_link")) missing.push("editor_link");
+  }
+
   if (missing.length > 0) {
     const labels = missing
       .map((key) => MISSING_FIELD_LABEL[key])
@@ -109,7 +143,8 @@ async function escalateScrollIssueHandler(
       },
       next_step_for_user: `Vui lòng cung cấp ${labels} để chúng tôi forward đến team technical kiểm tra giúp bạn.`,
       note_posted: false,
-      note_post_error: "Not ready for escalation — required fields missing.",
+      note_post_error:
+        "Not ready for escalation — Hugo MUST ask the user for the real screenshot URL and the real editor link, then call this tool again with the user's actual values. Do NOT fabricate placeholder URLs (no 'YOUR_STORE', no 'PAGE_ID', no 'dummyimage.com', etc.).",
     };
   }
 

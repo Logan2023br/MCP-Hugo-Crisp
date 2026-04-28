@@ -33,7 +33,23 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
       description: `
         Call this tool when the user reports that their PageFly page does not scroll, scrolls incorrectly, scroll is laggy, scroll is stuck, or any similar scroll-related problem.
 
-        This is a PURE-ESCALATION tool. It does NOT attempt to auto-fix anything. It collects info and returns a 3-line Crisp note for you to POST AS A PRIVATE NOTE on the Crisp conversation, so the technical team can pick it up.
+        ===========================================================
+        ABSOLUTE RULE — READ THIS FIRST
+        ===========================================================
+
+        DO NOT call this tool until you have BOTH:
+          1. A real screenshot URL the user has actually pasted or attached, AND
+          2. A real PageFly editor link the user has actually pasted.
+
+        NEVER fabricate, invent, paraphrase, or substitute placeholder values to "satisfy the schema". That includes (but is not limited to):
+          - "YOUR_STORE", "YOUR_SHOP", "YOUR_DOMAIN", "STORE_NAME", "SHOP_NAME", "PAGE_ID"
+          - "<store_name>", "{shop}", or any angle/curly-bracket placeholder
+          - "dummyimage.com", "placeholder.com", "example.com", "fake-…", "sample-…"
+          - Any URL that does not appear in the user's messages.
+
+        If the user has not yet provided a real screenshot URL and a real editor link, ASK THEM for both in chat (see STEP 1 below). Only when the user has actually pasted both values may you call this tool. The tool's server-side validation will REJECT placeholders and force you to ask the user again, which wastes the user's time.
+
+        This is a PURE-ESCALATION tool. It does NOT attempt to auto-fix anything. It collects info and (when crisp_session_id is provided) automatically POSTs a 3-line private note to the Crisp conversation so the technical team can pick it up.
 
         ===========================================================
         INPUTS
