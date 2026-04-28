@@ -51,36 +51,44 @@ function looksLikePlaceholder(url: string | undefined): boolean {
  * CRISP API CLIENT
  ***************************************************************************/
 
+interface CrispCreds {
+  websiteId: string;
+  identifier: string;
+  key: string;
+}
+
+function readCrispCreds(): CrispCreds | null {
+  const websiteId = process.env.CRISP_WEBSITE_ID;
+  const identifier = process.env.CRISP_IDENTIFIER;
+  const key = process.env.CRISP_KEY;
+  if (!websiteId || !identifier || !key) return null;
+  return { websiteId, identifier, key };
+}
+
+function buildAuthHeader(creds: CrispCreds): string {
+  return `Basic ${Buffer.from(`${creds.identifier}:${creds.key}`).toString("base64")}`;
+}
+
 interface PostNoteResult {
   posted: boolean;
   error?: string;
+  sessionUsed?: string;
+  sessionSource?: "input" | "auto-latest";
 }
 
 async function postCrispPrivateNote(
   sessionId: string,
-  content: string
-): Promise<PostNoteResult> {
-  const websiteId = process.env.CRISP_WEBSITE_ID;
-  const identifier = process.env.CRISP_IDENTIFIER;
-  const key = process.env.CRISP_KEY;
-
-  if (!websiteId || !identifier || !key) {
-    return {
-      posted: false,
-      error:
-        "Crisp API credentials not configured (set CRISP_WEBSITE_ID, CRISP_IDENTIFIER, CRISP_KEY in .env)",
-    };
-  }
-
-  const url = `https://api.crisp.chat/v1/website/${websiteId}/conversation/${sessionId}/message`;
-  const auth = Buffer.from(`${identifier}:${key}`).toString("base64");
+  content: string,
+  creds: CrispCreds
+): Promise<{ ok: boolean; error?: string }> {
+  const url = `https://api.crisp.chat/v1/website/${creds.websiteId}/conversation/${sessionId}/message`;
 
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Basic ${auth}`,
+        "Authorization": buildAuthHeader(creds),
         "X-Crisp-Tier": "plugin",
       },
       body: JSON.stringify({
@@ -94,16 +102,119 @@ async function postCrispPrivateNote(
     if (!response.ok) {
       const body = await response.text();
       return {
-        posted: false,
+        ok: false,
         error: `Crisp API ${response.status}: ${body.slice(0, 500)}`,
       };
     }
 
-    return { posted: true };
+    return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { posted: false, error: `Network/exception: ${message}` };
+    return { ok: false, error: `Network/exception: ${message}` };
   }
+}
+
+// Race-prone fallback: when Hugo does not pass crisp_session_id, list the
+// most recently active conversation in this website and assume it is the
+// one Hugo is replying to. Acceptable for single-tester demos; in
+// production we would expect Crisp to expose the session ID via the MCP
+// request context, or rely on a webhook-driven mapping.
+async function findLatestActiveSession(
+  creds: CrispCreds
+): Promise<{ sessionId: string | null; error?: string }> {
+  const url = `https://api.crisp.chat/v1/website/${creds.websiteId}/conversations/1`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": buildAuthHeader(creds),
+        "X-Crisp-Tier": "plugin",
+      },
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      return {
+        sessionId: null,
+        error: `Crisp list-conversations ${response.status}: ${body.slice(0, 300)}`,
+      };
+    }
+    const json = (await response.json()) as { data?: unknown };
+    const items = Array.isArray(json.data) ? (json.data as Array<Record<string, unknown>>) : [];
+    if (items.length === 0) {
+      return { sessionId: null, error: "No conversations returned by Crisp." };
+    }
+    items.sort((a, b) => {
+      const ta = (a.last_message as Record<string, unknown> | undefined)?.timestamp as number | undefined;
+      const tb = (b.last_message as Record<string, unknown> | undefined)?.timestamp as number | undefined;
+      return (tb ?? 0) - (ta ?? 0);
+    });
+    const sessionId = items[0]?.session_id as string | undefined;
+    if (!sessionId) {
+      return { sessionId: null, error: "Top conversation has no session_id field." };
+    }
+    return { sessionId };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { sessionId: null, error: `Network/exception: ${message}` };
+  }
+}
+
+async function tryPostNote(
+  hintedSessionId: string | undefined,
+  content: string
+): Promise<PostNoteResult> {
+  const creds = readCrispCreds();
+  if (!creds) {
+    return {
+      posted: false,
+      error:
+        "Crisp API credentials not configured (set CRISP_WEBSITE_ID, CRISP_IDENTIFIER, CRISP_KEY in .env).",
+    };
+  }
+
+  // 1) If Hugo passed a session ID, prefer it.
+  if (hintedSessionId) {
+    const r = await postCrispPrivateNote(hintedSessionId, content, creds);
+    if (r.ok) {
+      return {
+        posted: true,
+        sessionUsed: hintedSessionId,
+        sessionSource: "input",
+      };
+    }
+    return {
+      posted: false,
+      error: `Posting to provided session ${hintedSessionId} failed: ${r.error}`,
+      sessionUsed: hintedSessionId,
+      sessionSource: "input",
+    };
+  }
+
+  // 2) Fallback: query Crisp for the most recently active conversation in
+  //    this workspace and post there. Race-prone if multiple visitors are
+  //    chatting at once — only safe for single-tester demos.
+  const lookup = await findLatestActiveSession(creds);
+  if (!lookup.sessionId) {
+    return {
+      posted: false,
+      error: `No crisp_session_id provided and could not auto-resolve one: ${lookup.error}`,
+    };
+  }
+
+  const r = await postCrispPrivateNote(lookup.sessionId, content, creds);
+  if (r.ok) {
+    return {
+      posted: true,
+      sessionUsed: lookup.sessionId,
+      sessionSource: "auto-latest",
+    };
+  }
+  return {
+    posted: false,
+    error: `Auto-resolved session ${lookup.sessionId} but posting failed: ${r.error}`,
+    sessionUsed: lookup.sessionId,
+    sessionSource: "auto-latest",
+  };
 }
 
 /**************************************************************************
@@ -153,24 +264,15 @@ async function escalateScrollIssueHandler(
     `Editor: ${input.editor_link}\n` +
     `Ticket: ${input.ticket_url ?? TICKET_URL_FALLBACK}`;
 
-  let noteResult: PostNoteResult;
-  if (input.crisp_session_id) {
-    noteResult = await postCrispPrivateNote(input.crisp_session_id, noteContent);
-    if (!noteResult.posted) {
-      console.error(
-        `[escalate_scroll_issue] Failed to post Crisp note for session ${input.crisp_session_id}: ${noteResult.error}`
-      );
-    } else {
-      console.log(
-        `[escalate_scroll_issue] Posted Crisp note for session ${input.crisp_session_id}`
-      );
-    }
+  const noteResult: PostNoteResult = await tryPostNote(input.crisp_session_id, noteContent);
+  if (noteResult.posted) {
+    console.log(
+      `[escalate_scroll_issue] Posted Crisp note (session ${noteResult.sessionUsed}, source=${noteResult.sessionSource})`
+    );
   } else {
-    noteResult = {
-      posted: false,
-      error:
-        "No crisp_session_id provided — note text returned but not posted automatically.",
-    };
+    console.error(
+      `[escalate_scroll_issue] Failed to post Crisp note: ${noteResult.error}`
+    );
   }
 
   return {
