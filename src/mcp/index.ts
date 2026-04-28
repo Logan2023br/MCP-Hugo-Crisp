@@ -25,7 +25,7 @@ function createMcpServer(): McpServer {
         - Get order details (by ID)
         - Diagnose page-size issues (page exceeding the 256KB limit)
         - Diagnose font issues (live page shows different font than the editor)
-        - Escalate scroll issues to the technical team (page does not scroll or scrolls incorrectly)
+        - Escalate scroll issues to the technical team via escalate_scroll_issue (page does not scroll or scrolls incorrectly)
 
         Tools can be used successively to list a user's orders, then get an order details, and then get a product's information.
       `,

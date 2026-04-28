@@ -8,7 +8,7 @@ import { z } from "zod";
  * INPUT SCHEMA
  ***************************************************************************/
 
-const DIAGNOSE_SCROLL_INPUT_SHAPE = z.object({
+const ESCALATE_SCROLL_INPUT_SHAPE = z.object({
   issue_description: z
     .string()
     .min(1)
@@ -20,14 +20,7 @@ const DIAGNOSE_SCROLL_INPUT_SHAPE = z.object({
     .string()
     .url()
     .describe(
-      "PageFly editor link provided by the user. Format: https://admin.shopify.com/store/*/apps/pagefly/editor?type=page&id=*"
-    ),
-
-  ticket_url: z
-    .string()
-    .url()
-    .describe(
-      "Crisp conversation ticket URL pulled from the conversation context. Format: https://app.crisp.chat/website/*/inbox/*"
+      "The PageFly editor link the user pasted in this conversation. Take whatever URL the user actually sent — do not invent or use a placeholder."
     ),
 
   screenshot_url: z
@@ -35,11 +28,19 @@ const DIAGNOSE_SCROLL_INPUT_SHAPE = z.object({
     .url()
     .optional()
     .describe(
-      "ANY URL the user provided that points to a screenshot of the issue. Accept it as-is. Examples that ALL count: prnt.sc/abc, i.imgur.com/xyz.png, drive.google.com/..., or the Crisp attachment URL when the user uploaded a file directly in this conversation. Do NOT try to verify, OCR, or 'see' the image yourself — just pass the URL through. The technical team opens the URL and looks at the picture. Required for escalation."
+      "ANY URL pointing to a picture of the issue. Take the URL the user actually gave you (pasted link like prnt.sc, imgur, drive, or the Crisp file URL when they uploaded an image attachment). Do NOT verify, OCR, or 'view' the image yourself. Required for escalation."
+    ),
+
+  ticket_url: z
+    .string()
+    .url()
+    .optional()
+    .describe(
+      "Optional — only include if you actually have the live Crisp conversation URL from your runtime context. Do NOT fabricate one and do NOT paste any placeholder. If you don't have it, leave this field out entirely."
     ),
 });
 
-type DiagnosizeScrollInput = z.infer<typeof DIAGNOSE_SCROLL_INPUT_SHAPE>;
+type EscalateScrollInput = z.infer<typeof ESCALATE_SCROLL_INPUT_SHAPE>;
 
 /**************************************************************************
  * OUTPUT SCHEMA
@@ -58,7 +59,7 @@ const CRISP_NOTE = z.object({
     ),
 });
 
-const DIAGNOSE_SCROLL_OUTPUT_SHAPE = z.object({
+const ESCALATE_SCROLL_OUTPUT_SHAPE = z.object({
   issue_summary: z
     .string()
     .describe("Short summary Hugo can echo back to the user."),
@@ -66,7 +67,7 @@ const DIAGNOSE_SCROLL_OUTPUT_SHAPE = z.object({
   is_ready_for_escalation: z
     .boolean()
     .describe(
-      "True iff screenshot_url was provided. (editor_link and ticket_url are required by the input schema, so their presence is enforced before the handler runs.)"
+      "True iff screenshot_url was provided. ticket_url is optional and falls back to a placeholder if missing."
     ),
 
   missing_info: z
@@ -86,15 +87,15 @@ const DIAGNOSE_SCROLL_OUTPUT_SHAPE = z.object({
     ),
 });
 
-type DiagnosizeScrollOutput = z.infer<typeof DIAGNOSE_SCROLL_OUTPUT_SHAPE>;
+type EscalateScrollOutput = z.infer<typeof ESCALATE_SCROLL_OUTPUT_SHAPE>;
 
 /**************************************************************************
  * EXPORTS
  ***************************************************************************/
 
 export {
-  DIAGNOSE_SCROLL_INPUT_SHAPE,
-  DIAGNOSE_SCROLL_OUTPUT_SHAPE,
-  type DiagnosizeScrollInput,
-  type DiagnosizeScrollOutput,
+  ESCALATE_SCROLL_INPUT_SHAPE,
+  ESCALATE_SCROLL_OUTPUT_SHAPE,
+  type EscalateScrollInput,
+  type EscalateScrollOutput,
 };

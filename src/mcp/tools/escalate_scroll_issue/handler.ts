@@ -3,9 +3,9 @@
  ***************************************************************************/
 
 import type {
-  DiagnosizeScrollInput,
-  DiagnosizeScrollOutput,
-} from "@/mcp/tools/diagnose_scroll_issue/shapes.js";
+  EscalateScrollInput,
+  EscalateScrollOutput,
+} from "@/mcp/tools/escalate_scroll_issue/shapes.js";
 
 /**************************************************************************
  * CONSTANTS
@@ -14,26 +14,26 @@ import type {
 const WAIT_MESSAGE =
   "Vui lòng chờ vài phút, technical team đang kiểm tra và sẽ phản hồi bạn sớm nhất.";
 
-type MissingField = "screenshot" | "editor_link" | "ticket_url";
+type MissingField = "screenshot" | "editor_link";
 
 const MISSING_FIELD_LABEL: Record<MissingField, string> = {
   screenshot: "hình ảnh (screenshot)",
   editor_link: "link editor",
-  ticket_url: "ticket URL",
 };
+
+const TICKET_URL_FALLBACK = "(unknown — tool was called without ticket_url)";
 
 /**************************************************************************
  * MAIN HANDLER
  ***************************************************************************/
 
-function diagnosizeScrollIssueHandler(
-  input: DiagnosizeScrollInput
-): DiagnosizeScrollOutput {
+function escalateScrollIssueHandler(
+  input: EscalateScrollInput
+): EscalateScrollOutput {
   const missing: MissingField[] = [];
 
   if (!input.screenshot_url) missing.push("screenshot");
   if (!input.editor_link) missing.push("editor_link");
-  if (!input.ticket_url) missing.push("ticket_url");
 
   if (missing.length > 0) {
     const labels = missing
@@ -55,7 +55,7 @@ function diagnosizeScrollIssueHandler(
   const noteContent =
     `Issue: ${input.issue_description}, đây là hình ảnh: ${input.screenshot_url}\n` +
     `Editor: ${input.editor_link}\n` +
-    `Ticket: ${input.ticket_url}`;
+    `Ticket: ${input.ticket_url ?? TICKET_URL_FALLBACK}`;
 
   return {
     issue_summary: input.issue_description,
@@ -73,4 +73,4 @@ function diagnosizeScrollIssueHandler(
  * EXPORTS
  ***************************************************************************/
 
-export { diagnosizeScrollIssueHandler };
+export { escalateScrollIssueHandler };
