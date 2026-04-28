@@ -31,7 +31,7 @@ function diagnosizeScrollIssueHandler(
 ): DiagnosizeScrollOutput {
   const missing: MissingField[] = [];
 
-  if (!input.has_screenshot) missing.push("screenshot");
+  if (!input.screenshot_url) missing.push("screenshot");
   if (!input.editor_link) missing.push("editor_link");
   if (!input.ticket_url) missing.push("ticket_url");
 
@@ -53,7 +53,7 @@ function diagnosizeScrollIssueHandler(
   }
 
   const noteContent =
-    `Issue: ${input.issue_description}\n` +
+    `Issue: ${input.issue_description}, đây là hình ảnh: ${input.screenshot_url}\n` +
     `Editor: ${input.editor_link}\n` +
     `Ticket: ${input.ticket_url}`;
 

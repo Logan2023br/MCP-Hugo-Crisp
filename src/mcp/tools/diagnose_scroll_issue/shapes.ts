@@ -30,10 +30,12 @@ const DIAGNOSE_SCROLL_INPUT_SHAPE = z.object({
       "Crisp conversation ticket URL pulled from the conversation context. Format: https://app.crisp.chat/website/*/inbox/*"
     ),
 
-  has_screenshot: z
-    .boolean()
+  screenshot_url: z
+    .string()
+    .url()
+    .optional()
     .describe(
-      "True if Hugo has confirmed the user already sent a screenshot in the conversation. False otherwise — tool will refuse to escalate."
+      "URL of the screenshot the user uploaded in the conversation (Crisp exposes a public URL for every customer attachment). Required for escalation — tool will refuse to escalate without it."
     ),
 });
 
@@ -64,7 +66,7 @@ const DIAGNOSE_SCROLL_OUTPUT_SHAPE = z.object({
   is_ready_for_escalation: z
     .boolean()
     .describe(
-      "True iff has_screenshot is true. (editor_link and ticket_url are required by the input schema, so their presence is enforced before the handler runs.)"
+      "True iff screenshot_url was provided. (editor_link and ticket_url are required by the input schema, so their presence is enforced before the handler runs.)"
     ),
 
   missing_info: z
