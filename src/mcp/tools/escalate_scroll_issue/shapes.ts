@@ -45,6 +45,13 @@ const ESCALATE_SCROLL_INPUT_SHAPE = z.object({
     .describe(
       "The Crisp conversation session ID for this chat (looks like 'session_xxxxxxxx-xxxx-xxxx-...'). If you have it from your runtime context, include it — the tool will then POST the private note directly to this Crisp conversation via Crisp's REST API. If you do not have it, leave the field out and the tool will still return the note text but will NOT post it automatically."
     ),
+
+  customer_last_message_text: z
+    .string()
+    .optional()
+    .describe(
+      "Verbatim text của tin nhắn CUỐI CÙNG mà user gửi trong cuộc hội thoại này. Copy nguyên xi — KHÔNG paraphrase, KHÔNG trim, KHÔNG sửa typo, KHÔNG dịch. Tool dùng text này để tìm đúng conversation khi crisp_session_id không có. Bỏ qua field này nếu tin nhắn cuối là attachment/file (không có text)."
+    ),
 });
 
 type EscalateScrollInput = z.infer<typeof ESCALATE_SCROLL_INPUT_SHAPE>;
