@@ -6,6 +6,10 @@ import type {
   EscalateScrollInput,
   EscalateScrollOutput,
 } from "@/mcp/tools/escalate_scroll_issue/shapes.js";
+import {
+  findBestSession,
+  type ConversationLite,
+} from "@/mcp/tools/escalate_scroll_issue/scoring.js";
 
 /**************************************************************************
  * CONSTANTS
@@ -114,6 +118,41 @@ async function postCrispPrivateNote(
   }
 }
 
+const HUGO_INBOX_FILTER = "_internal:agent";
+
+interface FetchListResult {
+  conversations: ConversationLite[];
+  error?: string;
+}
+
+async function fetchHugoConversations(creds: CrispCreds): Promise<FetchListResult> {
+  const url =
+    `https://api.crisp.chat/v1/website/${creds.websiteId}/conversations/1` +
+    `?filter_inbox_id=${encodeURIComponent(HUGO_INBOX_FILTER)}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": buildAuthHeader(creds),
+        "X-Crisp-Tier": "plugin",
+      },
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      return {
+        conversations: [],
+        error: `Crisp list-conversations ${response.status}: ${body.slice(0, 300)}`,
+      };
+    }
+    const json = (await response.json()) as { data?: unknown };
+    const items = Array.isArray(json.data) ? (json.data as ConversationLite[]) : [];
+    return { conversations: items };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { conversations: [], error: `Network/exception: ${message}` };
+  }
+}
+
 // Crisp's conversation list API returns last_message as a plain string
 // (the text of the last message — no metadata). It also exposes
 // waiting_since: the timestamp at which the visitor sent a message that
@@ -128,12 +167,6 @@ async function postCrispPrivateNote(
 //      waiting_since — the visitor whose message is freshest and not
 //      yet replied to by an operator.
 //   3) Otherwise fall back to the most-recently-updated conversation.
-interface ConversationLite {
-  session_id?: string;
-  updated_at?: number;
-  waiting_since?: number | null;
-  last_message?: string;
-}
 
 async function findLatestActiveSession(
   creds: CrispCreds,
