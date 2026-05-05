@@ -6,7 +6,7 @@
   "author": "Crisp IM",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "lint": "eslint 'src/**/*.{ts,js}'",
     "inspect": "npx @modelcontextprotocol/inspector",
     "build": "tsc --build tsconfig.json && tsc-alias -p tsconfig.json",
