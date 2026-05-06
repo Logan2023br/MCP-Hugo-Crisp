@@ -79,12 +79,32 @@ interface SessionMatchInfo {
   thresholdMet: boolean;
 }
 
+interface NoteFields {
+  issueDescription: string;
+  screenshotUrl: string;
+  editorLink: string;
+  providedTicketUrl?: string;
+}
+
 interface PostNoteResult {
   posted: boolean;
   error?: string;
   sessionUsed?: string;
   sessionSource?: "input" | "scored";
   match?: SessionMatchInfo;
+  noteContent: string;
+}
+
+function buildTicketUrl(websiteId: string, sessionId: string): string {
+  return `https://app.crisp.chat/website/${websiteId}/inbox/${sessionId}`;
+}
+
+function formatNoteContent(fields: NoteFields, ticketUrl: string): string {
+  return (
+    `Issue: ${fields.issueDescription}, đây là hình ảnh: ${fields.screenshotUrl}\n` +
+    `Editor: ${fields.editorLink}\n` +
+    `Ticket: ${ticketUrl}`
+  );
 }
 
 async function postCrispPrivateNote(
@@ -162,7 +182,7 @@ async function fetchHugoConversations(creds: CrispCreds): Promise<FetchListResul
 
 async function tryPostNote(
   hintedSessionId: string | undefined,
-  content: string,
+  noteFields: NoteFields,
   scoringInputs: {
     customerLastMessageText?: string;
     screenshotUrl?: string;
@@ -175,32 +195,56 @@ async function tryPostNote(
       posted: false,
       error:
         "Crisp API credentials not configured (set CRISP_WEBSITE_ID, CRISP_IDENTIFIER, CRISP_KEY in .env).",
+      noteContent: formatNoteContent(
+        noteFields,
+        noteFields.providedTicketUrl ?? TICKET_URL_FALLBACK
+      ),
     };
   }
 
   // 1) Hugo truyền session_id → POST thẳng, không cần scoring.
   if (hintedSessionId) {
-    const r = await postCrispPrivateNote(hintedSessionId, content, creds);
+    const ticketUrl =
+      noteFields.providedTicketUrl ?? buildTicketUrl(creds.websiteId, hintedSessionId);
+    const noteContent = formatNoteContent(noteFields, ticketUrl);
+    const r = await postCrispPrivateNote(hintedSessionId, noteContent, creds);
     if (r.ok) {
-      return { posted: true, sessionUsed: hintedSessionId, sessionSource: "input" };
+      return {
+        posted: true,
+        sessionUsed: hintedSessionId,
+        sessionSource: "input",
+        noteContent,
+      };
     }
     return {
       posted: false,
       error: `Posting to provided session ${hintedSessionId} failed: ${r.error}`,
       sessionUsed: hintedSessionId,
       sessionSource: "input",
+      noteContent,
     };
   }
 
   // 2) Auto-resolve qua hybrid scoring.
   const list = await fetchHugoConversations(creds);
   if (list.error) {
-    return { posted: false, error: list.error };
+    return {
+      posted: false,
+      error: list.error,
+      noteContent: formatNoteContent(
+        noteFields,
+        noteFields.providedTicketUrl ?? TICKET_URL_FALLBACK
+      ),
+    };
   }
   if (list.conversations.length === 0) {
     return {
       posted: false,
       error: "Hugo's inbox không có conversation nào để match.",
+      noteContent: formatNoteContent(
+        noteFields,
+        noteFields.providedTicketUrl ?? TICKET_URL_FALLBACK
+      ),
     };
   }
 
@@ -216,16 +260,24 @@ async function tryPostNote(
       posted: false,
       error: `Không tìm thấy conversation đủ tin cậy (top score ${best.score} < threshold 50). Signals: [${best.signalsMatched.join(", ")}]. Hugo nên xin user paste lại link hoặc dev xử tay.`,
       match: matchInfo,
+      noteContent: formatNoteContent(
+        noteFields,
+        noteFields.providedTicketUrl ?? TICKET_URL_FALLBACK
+      ),
     };
   }
 
-  const r = await postCrispPrivateNote(best.sessionId, content, creds);
+  const ticketUrl =
+    noteFields.providedTicketUrl ?? buildTicketUrl(creds.websiteId, best.sessionId);
+  const noteContent = formatNoteContent(noteFields, ticketUrl);
+  const r = await postCrispPrivateNote(best.sessionId, noteContent, creds);
   if (r.ok) {
     return {
       posted: true,
       sessionUsed: best.sessionId,
       sessionSource: "scored",
       match: matchInfo,
+      noteContent,
     };
   }
   return {
@@ -234,6 +286,7 @@ async function tryPostNote(
     sessionUsed: best.sessionId,
     sessionSource: "scored",
     match: matchInfo,
+    noteContent,
   };
 }
 
@@ -279,18 +332,22 @@ async function escalateScrollIssueHandler(
     };
   }
 
-  const noteContent =
-    `Issue: ${input.issue_description}, đây là hình ảnh: ${input.screenshot_url}\n` +
-    `Editor: ${input.editor_link}\n` +
-    `Ticket: ${input.ticket_url ?? TICKET_URL_FALLBACK}`;
+  // Past the missing-info gate above, both fields are guaranteed present.
+  const screenshotUrl = input.screenshot_url as string;
+  const editorLink = input.editor_link as string;
 
   const noteResult: PostNoteResult = await tryPostNote(
     input.crisp_session_id,
-    noteContent,
+    {
+      issueDescription: input.issue_description,
+      screenshotUrl,
+      editorLink,
+      providedTicketUrl: input.ticket_url,
+    },
     {
       customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl: input.screenshot_url,
-      editorLink: input.editor_link,
+      screenshotUrl,
+      editorLink,
     }
   );
   if (noteResult.posted) {
@@ -308,8 +365,8 @@ async function escalateScrollIssueHandler(
     is_ready_for_escalation: true,
     missing_info: [],
     crisp_note: {
-      content: noteContent,
-      formatted_message: noteContent,
+      content: noteResult.noteContent,
+      formatted_message: noteResult.noteContent,
     },
     next_step_for_user: WAIT_MESSAGE,
     note_posted: noteResult.posted,
