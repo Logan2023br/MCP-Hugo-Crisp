@@ -72,18 +72,25 @@ function parseClaudeResponse(rawText: string): { kind: "reply"; text: string } |
 
 const NOTE_TRIGGER_PREFIX = "hugo:";
 
+// Crisp's Slack integration prefixes notes with the operator's Slack
+// profile link in markdown form: "[Logan TS](https://...): Hugo: ...".
+// Strip that wrapper if present so downstream prefix matching still works.
+function stripSlackBridgePrefix(content: string): string {
+  const m = content.match(/^\s*\[[^\]]+\]\([^)]+\):\s*([\s\S]+)$/);
+  return m ? m[1] : content;
+}
+
 function stripHugoPrefix(content: string): string {
-  // Removes a leading "Hugo:" (case-insensitive) plus surrounding whitespace.
-  const trimmed = content.trim();
-  if (trimmed.toLowerCase().startsWith(NOTE_TRIGGER_PREFIX)) {
-    return trimmed.slice(NOTE_TRIGGER_PREFIX.length).trim();
+  const cleaned = stripSlackBridgePrefix(content).trim();
+  if (cleaned.toLowerCase().startsWith(NOTE_TRIGGER_PREFIX)) {
+    return cleaned.slice(NOTE_TRIGGER_PREFIX.length).trim();
   }
-  return trimmed;
+  return cleaned;
 }
 
 function hasHugoPrefix(content: string | undefined): boolean {
   if (!content) return false;
-  return content.trim().toLowerCase().startsWith(NOTE_TRIGGER_PREFIX);
+  return stripSlackBridgePrefix(content).trim().toLowerCase().startsWith(NOTE_TRIGGER_PREFIX);
 }
 
 /**************************************************************************
