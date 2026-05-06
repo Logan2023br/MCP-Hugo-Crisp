@@ -7,13 +7,21 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 
 import { createMcpServer } from "@/mcp/index.js";
 import { mcpLogger } from "@/utils/logger.js";
+import { handleCrispWebhook } from "@/webhooks/crisp.js";
 
 /**************************************************************************
  * SERVER
  ***************************************************************************/
 
 const app = express();
-app.use(express.json());
+// Capture raw body so the Crisp webhook handler can verify HMAC signatures.
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as { rawBody?: string }).rawBody = buf.toString("utf8");
+    },
+  })
+);
 
 const server = createMcpServer();
 
@@ -60,6 +68,15 @@ app.post("/mcp", (req, res) => {
         res.status(500).json({ error: "MCP request failed" });
       }
     });
+});
+
+app.post("/webhooks/crisp", (req, res) => {
+  handleCrispWebhook(req, res).catch((err: unknown) => {
+    console.error("[crisp-webhook] handler threw:", err);
+    if (!res.headersSent) {
+      res.status(500).send("handler error");
+    }
+  });
 });
 
 // Starting the server
