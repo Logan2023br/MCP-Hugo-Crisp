@@ -56,9 +56,15 @@ async function handleCrispWebhook(req: Request, res: Response): Promise<void> {
   const signature = req.header("X-Crisp-Signature");
   const secret = process.env.CRISP_WEBHOOK_SECRET;
 
-  if (!verifyHmacSignature(rawBody, signature, secret)) {
-    res.status(401).send("invalid signature");
-    return;
+  if (secret) {
+    if (!verifyHmacSignature(rawBody, signature, secret)) {
+      res.status(401).send("invalid signature");
+      return;
+    }
+  } else {
+    console.warn(
+      "[crisp-webhook] CRISP_WEBHOOK_SECRET not set — skipping HMAC verification (DO NOT use in production)"
+    );
   }
 
   let parsed: CrispWebhookEvent;
