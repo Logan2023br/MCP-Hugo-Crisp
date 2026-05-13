@@ -7,7 +7,10 @@ import type {
   EscalateCartDrawerOutput,
 } from "@/mcp/tools/escalate_cart_drawer_issue/shapes.js";
 import {
+  WAIT_MESSAGE,
   looksLikePlaceholder,
+  tryPostNoteWithScoring,
+  type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 
 /**************************************************************************
@@ -22,6 +25,30 @@ const MISSING_FIELD_LABEL: Record<MissingField, string> = {
 };
 
 /**************************************************************************
+ * NOTE FORMAT
+ ***************************************************************************/
+
+interface CartNoteFields {
+  issueDescription: string;
+  livePreviewUrl: string;
+  editorLink: string;
+  screenshotUrl?: string;
+}
+
+function formatCartNoteContent(fields: CartNoteFields, ticketUrl: string): string {
+  // Silently drop placeholder screenshot URLs (already filtered upstream,
+  // but defend in depth in case future call sites skip the gate).
+  const hasScreenshot =
+    fields.screenshotUrl && !looksLikePlaceholder(fields.screenshotUrl);
+
+  const issueLine = hasScreenshot
+    ? `Issue: ${fields.issueDescription}, live preview: ${fields.livePreviewUrl}, hình ảnh: ${fields.screenshotUrl}`
+    : `Issue: ${fields.issueDescription}, live preview: ${fields.livePreviewUrl}`;
+
+  return `${issueLine}\nEditor: ${fields.editorLink}\nTicket: ${ticketUrl}`;
+}
+
+/**************************************************************************
  * MAIN HANDLER
  ***************************************************************************/
 
@@ -33,9 +60,6 @@ async function escalateCartDrawerIssueHandler(
   if (!input.editor_link) missing.push("editor_link");
   if (!input.live_preview_url) missing.push("live_preview_url");
 
-  // Reject obvious placeholders. Hugo sometimes invents values like
-  // "YOUR_STORE", "example.com", "dummyimage.com" to satisfy the schema
-  // instead of asking the user. Treat these as "missing".
   if (input.editor_link && looksLikePlaceholder(input.editor_link)) {
     if (!missing.includes("editor_link")) missing.push("editor_link");
   }
@@ -57,12 +81,65 @@ async function escalateCartDrawerIssueHandler(
     };
   }
 
-  // Successful-escalation branch is added in Task 6.
-  throw new Error("not implemented: ready-to-escalate branch (added in Task 6)");
+  // Past the gate above, both fields are guaranteed present.
+  const editorLink = input.editor_link as string;
+  const livePreviewUrl = input.live_preview_url as string;
+  // Drop placeholder screenshots silently.
+  const screenshotUrl =
+    input.screenshot_url && !looksLikePlaceholder(input.screenshot_url)
+      ? input.screenshot_url
+      : undefined;
+
+  const noteResult: PostNoteResult = await tryPostNoteWithScoring({
+    hintedSessionId: input.crisp_session_id,
+    fields: {
+      issueDescription: input.issue_description,
+      livePreviewUrl,
+      editorLink,
+      screenshotUrl,
+    },
+    providedTicketUrl: input.ticket_url,
+    scoringInputs: {
+      customerLastMessageText: input.customer_last_message_text,
+      screenshotUrl,
+      editorLink,
+    },
+    formatNote: formatCartNoteContent,
+  });
+
+  if (noteResult.posted) {
+    console.log(
+      `[escalate_cart_drawer_issue] match: session=${noteResult.sessionUsed} source=${noteResult.sessionSource} score=${noteResult.match?.score ?? "n/a"} signals=[${noteResult.match?.signalsMatched.join(", ") ?? ""}] posted=true`
+    );
+  } else {
+    console.error(
+      `[escalate_cart_drawer_issue] match: posted=false error=${noteResult.error}`
+    );
+  }
+
+  return {
+    issue_summary: input.issue_description,
+    is_ready_for_escalation: true,
+    missing_info: [],
+    crisp_note: {
+      content: noteResult.noteContent,
+      formatted_message: noteResult.noteContent,
+    },
+    next_step_for_user: WAIT_MESSAGE,
+    note_posted: noteResult.posted,
+    note_post_error: noteResult.error,
+    session_match: noteResult.match
+      ? {
+          score: noteResult.match.score,
+          signals_matched: noteResult.match.signalsMatched,
+          threshold_met: noteResult.match.thresholdMet,
+        }
+      : undefined,
+  };
 }
 
 /**************************************************************************
  * EXPORTS
  ***************************************************************************/
 
-export { escalateCartDrawerIssueHandler };
+export { escalateCartDrawerIssueHandler, formatCartNoteContent };
