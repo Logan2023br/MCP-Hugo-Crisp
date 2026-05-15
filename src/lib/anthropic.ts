@@ -141,6 +141,7 @@ export {
   parseClaudeResponse,
   stripHugoPrefix,
   hasHugoPrefix,
+  stripSlackBridgePrefix,
   callClaude,
   NOTE_TRIGGER_PREFIX,
   SYSTEM_PROMPT,
