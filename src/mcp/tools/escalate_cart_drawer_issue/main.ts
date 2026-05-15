@@ -81,9 +81,15 @@ function registerEscalateCartDrawerIssueTool(server: McpServer): void {
         OUTPUT HANDLING
         ===========================================================
 
-        - is_ready_for_escalation === false → Do NOT post any note. Ask the user for what is listed in missing_info, using next_step_for_user as your reply.
-        - is_ready_for_escalation === true AND note_posted === true → Tool already posted. Reply with next_step_for_user verbatim. Do not duplicate.
-        - is_ready_for_escalation === true AND note_posted === false → Reply with next_step_for_user. If you can post a Crisp private note natively, post crisp_note.content.
+        - is_ready_for_escalation === false → Do NOT post any note. Ask the user for what is listed in missing_info, using next_step_for_user (translated to the user's language — see LANGUAGE rule below) as your reply.
+        - is_ready_for_escalation === true AND note_posted === true → Tool already posted. Reply with next_step_for_user (translated to the user's language).
+        - is_ready_for_escalation === true AND note_posted === false → Reply with next_step_for_user (translated to the user's language). If you can post a Crisp private note natively, post crisp_note.content unchanged.
+
+        ===========================================================
+        LANGUAGE OF YOUR REPLY TO THE USER
+        ===========================================================
+
+        next_step_for_user is returned in Vietnamese by default. Detect the user's chat language from their recent messages. If the user is chatting in a language OTHER than Vietnamese (English, Chinese, Arabic, …), TRANSLATE next_step_for_user to that language before sending. Preserve the friendly tone, emojis, and intent — only change the language. crisp_note.content stays in its original form (it's for the TS team, not the customer).
 
         ===========================================================
         EXACT NOTE FORMAT (do not change)

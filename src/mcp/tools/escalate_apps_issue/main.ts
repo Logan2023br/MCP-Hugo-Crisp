@@ -86,12 +86,20 @@ function registerEscalateAppsIssueTool(server: McpServer): void {
         - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why.
 
         ===========================================================
+        LANGUAGE OF YOUR REPLY TO THE USER
+        ===========================================================
+
+        next_step_for_user is returned in Vietnamese by default. Detect the user's chat language from their recent messages. If the user is chatting in a language OTHER than Vietnamese (English, Chinese, Arabic, …), TRANSLATE next_step_for_user to that language before sending to the user. Preserve the friendly tone, emojis, and intent — do NOT change the meaning, just translate. Always match the customer's language.
+
+        crisp_note.content stays in its original form (Vietnamese / English) — it is for the TS team, not the customer.
+
+        ===========================================================
         OUTPUT HANDLING
         ===========================================================
 
-        - is_ready_for_escalation === false → Do NOT post any note. Ask the user for what is listed in missing_info, using next_step_for_user as your reply.
-        - is_ready_for_escalation === true AND note_posted === true → Tool already posted. Reply with next_step_for_user verbatim.
-        - is_ready_for_escalation === true AND note_posted === false → Reply with next_step_for_user. If you can post a Crisp private note natively, post crisp_note.content.
+        - is_ready_for_escalation === false → Do NOT post any note. Ask the user for what is listed in missing_info, using next_step_for_user (translated to the user's language per the rule above) as your reply.
+        - is_ready_for_escalation === true AND note_posted === true → Tool already posted. Reply with next_step_for_user (translated to the user's language).
+        - is_ready_for_escalation === true AND note_posted === false → Reply with next_step_for_user (translated to the user's language). If you can post a Crisp private note natively, post crisp_note.content unchanged.
 
         ===========================================================
         EXACT NOTE FORMAT (do not change)
