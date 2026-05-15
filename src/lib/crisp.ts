@@ -224,6 +224,52 @@ async function fetchConversationMessages(
   }
 }
 
+interface CrispMeta {
+  // Crisp returns the meta under data.data — keep the same nested shape.
+  data?: {
+    nickname?: string;
+    email?: string;
+    data?: {
+      store_access?: unknown;
+      store_url?: unknown;
+      store_name?: unknown;
+      [key: string]: unknown;
+    };
+    device?: Record<string, unknown>;
+  };
+}
+
+interface FetchMetaResult {
+  meta?: CrispMeta;
+  error?: string;
+}
+
+async function fetchConversationMeta(
+  sessionId: string,
+  creds: CrispCreds
+): Promise<FetchMetaResult> {
+  const url = `https://api.crisp.chat/v1/website/${creds.websiteId}/conversation/${sessionId}/meta`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": buildAuthHeader(creds),
+        "X-Crisp-Tier": "plugin",
+      },
+    });
+    if (!response.ok) {
+      const responseBody = await response.text();
+      return {
+        error: `Crisp meta ${response.status}: ${responseBody.slice(0, 300)}`,
+      };
+    }
+    const json = (await response.json()) as CrispMeta;
+    return { meta: json };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: `Network/exception: ${message}` };
+  }
+}
+
 /**************************************************************************
  * EXPORTS
  ***************************************************************************/
@@ -236,6 +282,7 @@ export {
   postCrispText,
   fetchHugoConversations,
   fetchConversationMessages,
+  fetchConversationMeta,
   verifyHmacSignature,
   HUGO_INBOX_FILTER,
   type CrispCreds,
@@ -243,4 +290,6 @@ export {
   type FetchListResult,
   type CrispMessage,
   type FetchMessagesResult,
+  type CrispMeta,
+  type FetchMetaResult,
 };
