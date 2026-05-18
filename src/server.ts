@@ -91,6 +91,12 @@ app.post("/mcp", (req, res) => {
     });
 });
 
+// GET handler: some webhook providers (incl. Crisp) probe the URL with GET
+// before activating delivery. Respond 200 so they consider the endpoint live.
+app.get("/webhooks/crisp", (_req, res) => {
+  res.status(200).send("webhook endpoint OK");
+});
+
 app.post("/webhooks/crisp", (req, res) => {
   handleCrispWebhook(req, res).catch((err: unknown) => {
     console.error("[crisp-webhook] handler threw:", err);
