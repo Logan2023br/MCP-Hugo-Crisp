@@ -2,12 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { escalateCartDrawerIssueHandler } from "./handler.ts";
 
+// Stub that bypasses Crisp meta API by always reporting access granted.
+// Existing tests target the missing-info / formatter logic that runs AFTER
+// the access check; the new "missing crisp_session_id" test uses the
+// default (real) checker to exercise the access-pending path.
+const stubAccessReady = async () => ({ ready: true } as const);
+
 test("cart handler: missing editor_link → missing_info includes editor_link", async () => {
   const out = await escalateCartDrawerIssueHandler({
     issue_description: "Cart drawer không mở",
     editor_link: undefined as unknown as string,
     live_preview_url: "https://store.myshopify.com/products/test",
-  });
+  }, stubAccessReady);
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
   assert.equal(out.note_posted, false);
@@ -19,7 +25,7 @@ test("cart handler: missing live_preview_url → missing_info includes live_prev
     issue_description: "Cart drawer không mở",
     editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
     live_preview_url: undefined as unknown as string,
-  });
+  }, stubAccessReady);
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("live_preview_url"));
 });
@@ -29,7 +35,7 @@ test("cart handler: missing both → both in missing_info", async () => {
     issue_description: "Cart issue",
     editor_link: undefined as unknown as string,
     live_preview_url: undefined as unknown as string,
-  });
+  }, stubAccessReady);
   assert.ok(out.missing_info.includes("editor_link"));
   assert.ok(out.missing_info.includes("live_preview_url"));
 });
@@ -39,7 +45,7 @@ test("cart handler: placeholder editor_link → treated as missing", async () =>
     issue_description: "Cart issue",
     editor_link: "https://YOUR_STORE.myshopify.com/admin/apps/pagefly",
     live_preview_url: "https://store.myshopify.com/products/test",
-  });
+  }, stubAccessReady);
   assert.ok(out.missing_info.includes("editor_link"));
   assert.equal(out.note_posted, false);
 });
@@ -49,30 +55,35 @@ test("cart handler: placeholder live_preview → treated as missing", async () =
     issue_description: "Cart issue",
     editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
     live_preview_url: "https://example.com/products/test",
-  });
+  }, stubAccessReady);
   assert.ok(out.missing_info.includes("live_preview_url"));
 });
 
-test("cart handler: next_step_for_user mentions both labels when both missing (English default)", async () => {
+test("cart handler: missing-info fallback uses English when no customer text + no Claude key", async () => {
   const out = await escalateCartDrawerIssueHandler({
     issue_description: "Cart issue",
     editor_link: undefined as unknown as string,
     live_preview_url: undefined as unknown as string,
-  });
-  // No customer_last_message_text → defaults to English.
+  }, stubAccessReady);
+  // No customer_last_message_text + tests run without ANTHROPIC_API_KEY →
+  // helper falls through to English template.
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /the live preview URL/);
 });
 
-test("cart handler: next_step_for_user switches to Vietnamese when customer chats Vietnamese", async () => {
+test("cart handler: missing-info fallback uses Vietnamese when customer chats Vietnamese (Claude unavailable)", async () => {
   const out = await escalateCartDrawerIssueHandler({
     issue_description: "Cart issue",
     editor_link: undefined as unknown as string,
     live_preview_url: undefined as unknown as string,
     customer_last_message_text: "Mình bị lỗi cart drawer",
-  });
-  assert.match(out.next_step_for_user, /link editor/);
-  assert.match(out.next_step_for_user, /link live preview/);
+  }, stubAccessReady);
+  // Tests run without ANTHROPIC_API_KEY → falls back to VI heuristic wrapper.
+  // Labels remain English (passed through as-is in fallback). In production,
+  // Claude translates the whole reply naturally into Vietnamese.
+  assert.match(out.next_step_for_user, /the editor link/);
+  assert.match(out.next_step_for_user, /the live preview URL/);
+  assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
 
 import { formatCartNoteContent } from "./handler.ts";
@@ -121,4 +132,19 @@ test("formatCartNoteContent: silently drops placeholder screenshot", () => {
   // Should NOT include the placeholder URL.
   assert.ok(!note.includes("dummyimage.com"));
   assert.ok(!note.includes("screenshot"));
+});
+
+test("cart handler: missing crisp_session_id triggers access-pending output", async () => {
+  const out = await escalateCartDrawerIssueHandler({
+    issue_description: "Cart drawer does not open on ATC click",
+    editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+    live_preview_url: "https://store.myshopify.com/products/test",
+    // intentionally NO crisp_session_id — access check should short-circuit
+  });
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.ok(out.missing_info.includes("store_access"));
+  assert.equal(out.note_posted, false);
+  assert.equal(out.crisp_note.content, "");
+  // wait message defaults to English (no customer_last_message_text provided)
+  assert.match(out.next_step_for_user, /requesting access/i);
 });

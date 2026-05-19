@@ -108,7 +108,7 @@ const ESCALATE_CART_DRAWER_OUTPUT_SHAPE = z.object({
   missing_info: z
     .array(z.string())
     .describe(
-      "List of fields still missing. Possible values: 'editor_link', 'live_preview_url'. screenshot is optional and never blocks escalation."
+      "List of fields still missing. Possible values: 'editor_link', 'live_preview_url', 'store_access' (when the tool is waiting for the customer to grant Shopify collaborator access — relay next_step_for_user verbatim and wait for the customer to confirm). screenshot is optional and never blocks escalation."
     ),
 
   crisp_note: CRISP_NOTE.describe(

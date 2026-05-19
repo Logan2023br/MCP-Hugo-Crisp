@@ -50,6 +50,17 @@ function registerEscalateCartDrawerIssueTool(server: McpServer): void {
         If the user has not yet provided BOTH real links, follow STEP 1 below.
 
         ===========================================================
+        STORE ACCESS — AUTOMATICALLY HANDLED
+        ===========================================================
+
+        This issue typically requires Shopify store access for the technical team to debug theme code or app conflicts. When you call this tool, it automatically checks whether collaborator access has been granted.
+
+        - If access exists → tool proceeds to escalate normally.
+        - If no access yet → tool posts a private note for the TS team to request access, and returns a wait message in next_step_for_user. Relay that to the customer verbatim. The system handles the access flow end-to-end; once the customer grants access, they will tell you so. Then call this tool again with the same arguments to proceed.
+
+        You do NOT need to do anything manually about access. Just call the tool when the user has provided editor_link + live_preview_url, as before.
+
+        ===========================================================
         INPUTS
         ===========================================================
 
@@ -74,6 +85,7 @@ function registerEscalateCartDrawerIssueTool(server: McpServer): void {
         STEP 3 — User has provided BOTH editor link AND live preview link.
         a) Call escalate_cart_drawer_issue with: issue_description, editor_link, live_preview_url. Include screenshot_url if user attached one. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text (verbatim copy of user's last text message) unless the user's last message had no text content.
         b) Inspect the response:
+           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Do NOT post any extra note (tool already posted the @Logan request internally). Wait for the customer to confirm access has been granted, then call this tool again with the same arguments to proceed.
            - If note_posted === true → reply with next_step_for_user verbatim. Do NOT also try to post the note yourself.
            - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why posting failed.
 

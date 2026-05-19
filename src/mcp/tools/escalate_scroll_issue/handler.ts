@@ -7,10 +7,7 @@ import type {
   EscalateScrollOutput,
 } from "@/mcp/tools/escalate_scroll_issue/shapes.js";
 import {
-  TICKET_URL_FALLBACK,
-  hasVietnameseDiacritics,
   looksLikePlaceholder,
-  buildTicketUrl,
   pickMissingInfoMessage,
   pickWaitMessage,
   translateIssueToEnglish,
@@ -24,11 +21,9 @@ import {
 
 type MissingField = "screenshot" | "editor_link";
 
-const MISSING_LABELS_VI: Record<MissingField, string> = {
-  screenshot: "hình ảnh (screenshot)",
-  editor_link: "link editor",
-};
-
+// English labels are the single source of truth for what Hugo asks the
+// customer. The shared helper hands these to Claude which translates
+// naturally into the customer's chat language.
 const MISSING_LABELS_EN: Record<MissingField, string> = {
   screenshot: "a screenshot",
   editor_link: "the editor link",
@@ -71,9 +66,7 @@ async function escalateScrollIssueHandler(
   }
 
   if (missing.length > 0) {
-    const isVi = hasVietnameseDiacritics(input.customer_last_message_text);
-    const labelDict = isVi ? MISSING_LABELS_VI : MISSING_LABELS_EN;
-    const labels = missing.map((key) => labelDict[key]).join(", ");
+    const labelsEn = missing.map((key) => MISSING_LABELS_EN[key]).join(", ");
 
     return {
       issue_summary: "Need more information before escalating to the technical team.",
@@ -83,7 +76,7 @@ async function escalateScrollIssueHandler(
         content: "",
         formatted_message: "",
       },
-      next_step_for_user: pickMissingInfoMessage(input.customer_last_message_text, labels),
+      next_step_for_user: await pickMissingInfoMessage(input.customer_last_message_text, labelsEn),
       note_posted: false,
       note_post_error:
         "Not ready for escalation — Hugo MUST ask the user for the real screenshot URL and the real editor link, then call this tool again with the user's actual values. Do NOT fabricate placeholder URLs (no 'YOUR_STORE', no 'PAGE_ID', no 'dummyimage.com', etc.).",
@@ -130,7 +123,7 @@ async function escalateScrollIssueHandler(
       content: noteResult.noteContent,
       formatted_message: noteResult.noteContent,
     },
-    next_step_for_user: pickWaitMessage(input.customer_last_message_text),
+    next_step_for_user: await pickWaitMessage(input.customer_last_message_text),
     note_posted: noteResult.posted,
     note_post_error: noteResult.error,
     session_match: noteResult.match

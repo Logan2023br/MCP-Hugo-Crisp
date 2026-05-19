@@ -43,17 +43,21 @@ test("hasStoreAccess: non-string value => false", () => {
   assert.equal(hasStoreAccess(meta), false);
 });
 
-test("pickAccessPendingWaitMessage: Vietnamese diacritics => VI", () => {
-  assert.equal(pickAccessPendingWaitMessage("Tôi không scroll được"), ACCESS_PENDING_WAIT_VI);
+// Tests run without ANTHROPIC_API_KEY → Claude generation fails →
+// helper falls back to VI/EN heuristic templates (the assertions below).
+// Production path with API key generates a reply in the customer's actual
+// chat language (any language Claude supports).
+test("pickAccessPendingWaitMessage: Vietnamese diacritics => VI fallback", async () => {
+  assert.equal(await pickAccessPendingWaitMessage("Tôi không scroll được"), ACCESS_PENDING_WAIT_VI);
 });
 
-test("pickAccessPendingWaitMessage: English => EN", () => {
-  assert.equal(pickAccessPendingWaitMessage("My page is broken"), ACCESS_PENDING_WAIT_EN);
+test("pickAccessPendingWaitMessage: English => EN fallback", async () => {
+  assert.equal(await pickAccessPendingWaitMessage("My page is broken"), ACCESS_PENDING_WAIT_EN);
 });
 
-test("pickAccessPendingWaitMessage: empty / undefined => EN default", () => {
-  assert.equal(pickAccessPendingWaitMessage(""), ACCESS_PENDING_WAIT_EN);
-  assert.equal(pickAccessPendingWaitMessage(undefined), ACCESS_PENDING_WAIT_EN);
+test("pickAccessPendingWaitMessage: empty / undefined => EN fallback default", async () => {
+  assert.equal(await pickAccessPendingWaitMessage(""), ACCESS_PENDING_WAIT_EN);
+  assert.equal(await pickAccessPendingWaitMessage(undefined), ACCESS_PENDING_WAIT_EN);
 });
 
 test("AT_LOGAN_NOTE_CONTENT mentions Logan and the standard permissions list", () => {

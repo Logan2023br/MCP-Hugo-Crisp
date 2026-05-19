@@ -90,20 +90,21 @@ test("apps handler: multiple fields missing → all in missing_info", async () =
   assert.ok(out.missing_info.includes("publish_status"));
 });
 
-test("apps handler: next_step_for_user defaults to English labels", async () => {
+test("apps handler: missing-info fallback uses English when no customer text + no Claude key", async () => {
   const out = await escalateAppsIssueHandler({
     issue_description: "App issue",
     editor_links: [],
     media_urls: [],
     publish_status: undefined as unknown as "published",
   });
-  // No customer_last_message_text → defaults to English.
+  // No customer_last_message_text + tests run without ANTHROPIC_API_KEY →
+  // helper falls through to English template.
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /an image or video/);
   assert.match(out.next_step_for_user, /whether the page is published/);
 });
 
-test("apps handler: next_step_for_user switches to Vietnamese when customer chats Vietnamese", async () => {
+test("apps handler: missing-info fallback uses Vietnamese when customer chats Vietnamese (Claude unavailable)", async () => {
   const out = await escalateAppsIssueHandler({
     issue_description: "App issue",
     editor_links: [],
@@ -111,9 +112,12 @@ test("apps handler: next_step_for_user switches to Vietnamese when customer chat
     publish_status: undefined as unknown as "published",
     customer_last_message_text: "Mình bị lỗi app không hiển thị",
   });
-  assert.match(out.next_step_for_user, /link editor/);
-  assert.match(out.next_step_for_user, /hình ảnh hoặc video/);
-  assert.match(out.next_step_for_user, /trạng thái publish/);
+  // Tests run without ANTHROPIC_API_KEY → falls back to VI heuristic.
+  // English labels are passed in; fallback wraps them in Vietnamese template.
+  assert.match(out.next_step_for_user, /the editor link/);
+  assert.match(out.next_step_for_user, /an image or video/);
+  assert.match(out.next_step_for_user, /whether the page is published/);
+  assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
 
 import { formatAppsNoteContent } from "./handler.ts";

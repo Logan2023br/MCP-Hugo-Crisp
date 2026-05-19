@@ -1,0 +1,140 @@
+/**************************************************************************
+ * IMPORTS
+ ***************************************************************************/
+
+import { escalateAnimationIssueHandler } from "@/mcp/tools/escalate_animation_issue/handler.js";
+import {
+  ESCALATE_ANIMATION_INPUT_SHAPE,
+  ESCALATE_ANIMATION_OUTPUT_SHAPE,
+} from "@/mcp/tools/escalate_animation_issue/shapes.js";
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type {
+  EscalateAnimationInput,
+  EscalateAnimationOutput,
+} from "@/mcp/tools/escalate_animation_issue/shapes.js";
+
+/**************************************************************************
+ * TOOL REGISTRATION
+ ***************************************************************************/
+
+function registerEscalateAnimationIssueTool(server: McpServer): void {
+  server.registerTool(
+    "escalate_animation_issue",
+    {
+      title: "Escalate PageFly animation / visual effect request to technical team",
+      description: `
+        Call this tool when the user asks how to achieve a visual effect, animation, or copy a section/effect from a reference site, OR reports that an effect/animation does not work. Common phrasings:
+          - "Làm sao để sao chép section giống mẫu của trang web này"
+          - "Làm sao đạt được hiệu ứng này / hiệu ứng như mẫu ở trang web khác"
+          - "Không thêm được animation"
+          - "Hiệu ứng không hoạt động"
+          - "How can I get this effect", "How do I replicate this animation"
+          - Any animation / transition / visual effect / "make it look like X" request.
+
+        ===========================================================
+        ABSOLUTE RULE — READ THIS FIRST
+        ===========================================================
+
+        DO NOT call this tool until you have ALL of:
+          1. A real PageFly editor link the user has actually pasted.
+          2. At least one reference of the desired effect — EITHER one or more URLs the user pasted (Loom recording, image, link to reference website) OR a confirmation that the user attached files (image/video upload) directly in the Crisp chat.
+          3. The user's answer for publish_status: are we allowed to publish the page, or save only ('published' / 'only_save').
+
+        NEVER fabricate, invent, paraphrase, or substitute placeholder values to "satisfy the schema". The tool's server-side validation will REJECT placeholders (YOUR_STORE, example.com, dummyimage.com, etc.).
+
+        If the user has not yet provided all three, follow STEP 1 below.
+
+        ===========================================================
+        STORE ACCESS — AUTOMATICALLY HANDLED
+        ===========================================================
+
+        Animation requests require Shopify store access for the technical team to edit theme code or PageFly elements. When you call this tool, it automatically checks whether collaborator access has been granted.
+
+        - If access exists → tool proceeds to escalate normally.
+        - If no access yet → tool posts a private @Logan note to request access, and returns a wait message in next_step_for_user (in the customer's language). Relay it verbatim. The system handles the access flow end-to-end; once the customer grants access, they will tell you. Then call this tool again with the same arguments.
+
+        You do NOT need to do anything manually about access.
+
+        ===========================================================
+        INPUTS
+        ===========================================================
+
+        - issue_description (required) — Your one-line paraphrase of what effect the user wants or what animation is broken, ALWAYS IN ENGLISH (e.g. "Wants parallax scroll effect on hero section like reference site"). The technical team reads notes in English.
+        - editor_link (required) — The PageFly editor URL the user pasted. Take what the user sent. No placeholders.
+        - reference_urls (optional array) — EVERY URL the user pasted as a reference of the desired effect: link to reference website, Loom recording, image, etc. Include all of them. Omit if the user only attached files (then set customer_attached_files=true).
+        - customer_attached_files (optional boolean) — Set to TRUE if the user attached files DIRECTLY in the chat (image upload, video upload) instead of pasting links. TS team will open the Crisp ticket to view them. At least ONE of reference_urls or customer_attached_files=true must indicate evidence.
+        - publish_status (required) — "published" if the user said the technical team may publish the page after fixing. "only_save" if the user said save only / not publish.
+        - ticket_url (optional) — Only include if your runtime exposes the live Crisp conversation URL. Auto-built from crisp_session_id otherwise.
+        - crisp_session_id (optional but STRONGLY recommended) — The Crisp session ID for THIS conversation.
+        - customer_last_message_text (optional but STRONGLY recommended) — Verbatim copy of user's last text message. KHÔNG paraphrase, KHÔNG translate, KHÔNG fix typo, KHÔNG trim.
+
+        ===========================================================
+        WHAT YOU MUST DO
+        ===========================================================
+
+        STEP 1 — User asks for an animation / effect / "how to copy this design", but has not provided required info.
+        Reply (in the customer's language — adapt the wording naturally):
+        "Để team kỹ thuật giúp bạn dựng hiệu ứng này, vui lòng cung cấp:
+        1. Link website / ảnh / video minh hoạ hiệu ứng bạn muốn đạt được (có thể gửi file đính kèm cũng được)
+        2. Link editor của page đang làm
+        3. Sau khi team fix xong, mình có thể publish luôn hay chỉ save thôi?
+        Bạn cho mình xin nhé."
+
+        STEP 2 — User has provided only part of the info. Ask politely for the remaining items. Do not call the tool yet.
+
+        STEP 3 — User has provided editor_link + (at least one reference URL OR attached files) + publish_status answer.
+        a) Call escalate_animation_issue with all collected fields. If the user attached files in chat, set customer_attached_files=true (and reference_urls may be empty/omitted). If the user only pasted links, include them in reference_urls and omit customer_attached_files.
+        b) Inspect the response:
+           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Do NOT post any extra note (tool already posted the @Logan request internally). Wait for the customer to confirm access has been granted, then call this tool again.
+           - If note_posted === true → reply with next_step_for_user verbatim. Do NOT also try to post the note yourself.
+           - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why posting failed.
+
+        ===========================================================
+        OUTPUT HANDLING
+        ===========================================================
+
+        - is_ready_for_escalation === false → Do NOT post any note. Ask the user for what is listed in missing_info, using next_step_for_user as your reply.
+        - is_ready_for_escalation === true AND note_posted === true → Tool already posted. Reply with next_step_for_user.
+        - is_ready_for_escalation === true AND note_posted === false → Reply with next_step_for_user. If you can post a Crisp private note natively, post crisp_note.content unchanged.
+
+        ===========================================================
+        LANGUAGE OF YOUR REPLY TO THE USER
+        ===========================================================
+
+        next_step_for_user is already returned in the customer's language (the tool detects via customer_last_message_text and asks Claude to generate in that language). Reply with it VERBATIM — do NOT translate it again, do NOT paraphrase. crisp_note.content is always English — it is for the TS team, not the customer.
+
+        ===========================================================
+        EXACT NOTE FORMAT (do not change)
+        ===========================================================
+
+        Issue: <issue_description>[, reference: <urls or "customer attached files in ticket">]
+        Editor: <editor_link>
+        Ticket: <ticket_url or "(unknown)" if omitted>
+        <"Allowed to publish" if publish_status="published", else "Only Save">
+
+        The "reference: …" segment is appended only when reference_urls or customer_attached_files is set. When both URLs and files exist, the line reads: "reference: <urls> (customer also attached files in ticket)".
+      `,
+      inputSchema: ESCALATE_ANIMATION_INPUT_SHAPE,
+      outputSchema: ESCALATE_ANIMATION_OUTPUT_SHAPE,
+    },
+    async (input: EscalateAnimationInput) => {
+      const output: EscalateAnimationOutput = await escalateAnimationIssueHandler(input);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(output, null, 2),
+          },
+        ],
+        structuredContent: output,
+      };
+    }
+  );
+}
+
+/**************************************************************************
+ * EXPORTS
+ ***************************************************************************/
+
+export { registerEscalateAnimationIssueTool };

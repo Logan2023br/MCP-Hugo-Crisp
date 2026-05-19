@@ -3,7 +3,7 @@
  ***************************************************************************/
 
 import { hasVietnameseDiacritics } from "@/lib/escalation-shared.js";
-import { stripSlackBridgePrefix } from "@/lib/anthropic.js";
+import { generateCustomerReply, stripSlackBridgePrefix } from "@/lib/anthropic.js";
 import type { CrispMeta } from "@/lib/crisp.js";
 import {
   readCrispCreds,
@@ -68,8 +68,21 @@ function hasStoreAccess(meta: CrispMeta | undefined): boolean {
  * WAIT MESSAGE PICKER
  ***************************************************************************/
 
-function pickAccessPendingWaitMessage(customerText: string | undefined): string {
+function fallbackAccessPendingWaitMessage(customerText: string | undefined): string {
   return hasVietnameseDiacritics(customerText) ? ACCESS_PENDING_WAIT_VI : ACCESS_PENDING_WAIT_EN;
+}
+
+async function pickAccessPendingWaitMessage(
+  customerText: string | undefined
+): Promise<string> {
+  const result = await generateCustomerReply({
+    intent: "access_pending",
+    customerLastMessage: customerText,
+  });
+  if (result.ok && result.text && result.text.trim().length > 0) {
+    return result.text.trim();
+  }
+  return fallbackAccessPendingWaitMessage(customerText);
 }
 
 /**************************************************************************
@@ -100,7 +113,7 @@ async function requireStoreAccess(
         is_ready_for_escalation: false,
         missing_info: ["store_access"],
         crisp_note: { content: "", formatted_message: "" },
-        next_step_for_user: pickAccessPendingWaitMessage(customerLastMessageText),
+        next_step_for_user: await pickAccessPendingWaitMessage(customerLastMessageText),
         note_posted: false,
         note_post_error: "Missing crisp_session_id — cannot check store access.",
       },
@@ -115,7 +128,7 @@ async function requireStoreAccess(
         is_ready_for_escalation: false,
         missing_info: ["store_access"],
         crisp_note: { content: "", formatted_message: "" },
-        next_step_for_user: pickAccessPendingWaitMessage(customerLastMessageText),
+        next_step_for_user: await pickAccessPendingWaitMessage(customerLastMessageText),
         note_posted: false,
         note_post_error:
           "Crisp API credentials not configured (set CRISP_WEBSITE_ID, CRISP_IDENTIFIER, CRISP_KEY in .env).",
@@ -150,7 +163,7 @@ async function requestAccessViaLogan(
       is_ready_for_escalation: false,
       missing_info: ["store_access"],
       crisp_note: { content: "", formatted_message: "" },
-      next_step_for_user: pickAccessPendingWaitMessage(customerLastMessageText),
+      next_step_for_user: await pickAccessPendingWaitMessage(customerLastMessageText),
       note_posted: post.ok,
       note_post_error: errors.length > 0 ? errors.join(" | ") : undefined,
     },
