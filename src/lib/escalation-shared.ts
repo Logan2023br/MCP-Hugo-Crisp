@@ -139,6 +139,58 @@ function buildTicketUrl(websiteId: string, sessionId: string): string {
 }
 
 /**************************************************************************
+ * REFERENCE MEDIA — URL or attached file
+ ***************************************************************************/
+
+// Many escalation tools collect "media" the customer provides as evidence or
+// reference (screenshots, screen recordings, design mockups). The customer
+// might either paste a URL (Loom, Imgur, a website) OR attach a file directly
+// in the Crisp chat. Hugo sees the file as an attachment in the conversation
+// but cannot extract a URL for it. To handle both cases uniformly, tools
+// accept BOTH a `urls` array AND a `hasAttachedFiles` boolean — at least
+// one must be true for the media field to count as provided.
+interface ReferenceMediaInput {
+  urls?: string[];
+  hasAttachedFiles?: boolean;
+}
+
+function filterValidUrls(urls: string[] | undefined): string[] {
+  if (!Array.isArray(urls)) return [];
+  return urls.filter(
+    (u) => typeof u === "string" && u.length > 0 && !looksLikePlaceholder(u)
+  );
+}
+
+function hasAnyReferenceMedia(media: ReferenceMediaInput): boolean {
+  const validUrls = filterValidUrls(media.urls);
+  return validUrls.length > 0 || media.hasAttachedFiles === true;
+}
+
+// Builds the note fragment for a media field. Examples:
+//   formatReferenceMedia({urls:["https://loom/a"]},"reference") →
+//     "reference: https://loom/a"
+//   formatReferenceMedia({hasAttachedFiles:true},"reference") →
+//     "reference: customer attached files in ticket"
+//   formatReferenceMedia({urls:["https://loom/a"],hasAttachedFiles:true},"reference") →
+//     "reference: https://loom/a (customer also attached files in ticket)"
+//   formatReferenceMedia({},"reference") → "" (caller should gate with hasAnyReferenceMedia first)
+function formatReferenceMedia(
+  media: ReferenceMediaInput,
+  label: string
+): string {
+  const validUrls = filterValidUrls(media.urls);
+  const hasFiles = media.hasAttachedFiles === true;
+  if (validUrls.length === 0 && !hasFiles) return "";
+  if (validUrls.length === 0 && hasFiles) {
+    return `${label}: customer attached files in ticket`;
+  }
+  if (validUrls.length > 0 && !hasFiles) {
+    return `${label}: ${validUrls.join(", ")}`;
+  }
+  return `${label}: ${validUrls.join(", ")} (customer also attached files in ticket)`;
+}
+
+/**************************************************************************
  * POST-WITH-SCORING GENERIC
  ***************************************************************************/
 
@@ -267,12 +319,16 @@ export {
   TICKET_URL_FALLBACK,
   PLACEHOLDER_PATTERNS,
   looksLikePlaceholder,
+  filterValidUrls,
   buildTicketUrl,
   hasVietnameseDiacritics,
   pickWaitMessage,
   pickMissingInfoMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  formatReferenceMedia,
+  hasAnyReferenceMedia,
   type SessionMatchInfo,
   type PostNoteResult,
+  type ReferenceMediaInput,
 };

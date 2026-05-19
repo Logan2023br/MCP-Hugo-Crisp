@@ -12,6 +12,7 @@ import { registerDiagnosizeFontIssueTool } from "@/mcp/tools/diagnose_font_issue
 import { registerEscalateScrollIssueTool } from "@/mcp/tools/escalate_scroll_issue/main.js";
 import { registerEscalateCartDrawerIssueTool } from "@/mcp/tools/escalate_cart_drawer_issue/main.js";
 import { registerEscalateAppsIssueTool } from "@/mcp/tools/escalate_apps_issue/main.js";
+import { registerEscalateAnimationIssueTool } from "@/mcp/tools/escalate_animation_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -27,6 +28,7 @@ function registerTools(server: McpServer): void {
   registerEscalateScrollIssueTool(server);
   registerEscalateCartDrawerIssueTool(server);
   registerEscalateAppsIssueTool(server);
+  registerEscalateAnimationIssueTool(server);
 }
 
 /**************************************************************************
