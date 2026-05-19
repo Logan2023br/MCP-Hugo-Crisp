@@ -13,6 +13,7 @@ import { registerEscalateScrollIssueTool } from "@/mcp/tools/escalate_scroll_iss
 import { registerEscalateCartDrawerIssueTool } from "@/mcp/tools/escalate_cart_drawer_issue/main.js";
 import { registerEscalateAppsIssueTool } from "@/mcp/tools/escalate_apps_issue/main.js";
 import { registerEscalateAnimationIssueTool } from "@/mcp/tools/escalate_animation_issue/main.js";
+import { registerEscalatePageBrokenIssueTool } from "@/mcp/tools/escalate_page_broken_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -29,6 +30,7 @@ function registerTools(server: McpServer): void {
   registerEscalateCartDrawerIssueTool(server);
   registerEscalateAppsIssueTool(server);
   registerEscalateAnimationIssueTool(server);
+  registerEscalatePageBrokenIssueTool(server);
 }
 
 /**************************************************************************

@@ -1,0 +1,142 @@
+/**************************************************************************
+ * IMPORTS
+ ***************************************************************************/
+
+import { escalatePageBrokenIssueHandler } from "@/mcp/tools/escalate_page_broken_issue/handler.js";
+import {
+  ESCALATE_PAGE_BROKEN_INPUT_SHAPE,
+  ESCALATE_PAGE_BROKEN_OUTPUT_SHAPE,
+} from "@/mcp/tools/escalate_page_broken_issue/shapes.js";
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type {
+  EscalatePageBrokenInput,
+  EscalatePageBrokenOutput,
+} from "@/mcp/tools/escalate_page_broken_issue/shapes.js";
+
+/**************************************************************************
+ * TOOL REGISTRATION
+ ***************************************************************************/
+
+function registerEscalatePageBrokenIssueTool(server: McpServer): void {
+  server.registerTool(
+    "escalate_page_broken_issue",
+    {
+      title: "Escalate broken PageFly page (styles/layout broken) to technical team",
+      description: `
+        Call this tool ONLY AFTER the self-help script in STEP 1 has been walked through and failed. The user must have a PageFly page that is visibly broken (styles missing, layout collapsed, etc.). Common phrasings:
+          - "Style của page PageFly bị broken"
+          - "Sau khi đổi theme thì page bị broken"
+          - "Nhiều page bị broken cùng lúc"
+          - "Page bị broken nhưng sau khi publish thì hoạt động lại"
+          - "My PageFly page is broken / styles are missing"
+
+        ===========================================================
+        ABSOLUTE RULE — READ THIS FIRST
+        ===========================================================
+
+        DO NOT call this tool until:
+          1. You have walked the user through the full STEP 1 self-help script below, AND
+          2. The user has reported the page is STILL broken after all self-help steps, AND
+          3. You have collected real editor link(s) the user actually pasted, AND
+          4. The user has explicitly said yes to publishing the page(s) after the fix.
+
+        NEVER fabricate or substitute placeholder URLs. Server-side validation will REJECT placeholders (YOUR_STORE, example.com, dummyimage.com, etc.).
+
+        ===========================================================
+        STORE ACCESS — AUTOMATICALLY HANDLED
+        ===========================================================
+
+        Page-broken issues require Shopify store access for the technical team to debug theme code and publish the fixed page. When you call this tool, it automatically checks whether collaborator access has been granted.
+
+        - If access exists → tool proceeds to escalate normally.
+        - If no access yet → tool posts a private @Logan note to request access and returns a wait message in next_step_for_user (in the customer's language). Relay it verbatim. Once the customer grants access, they will tell you. Then call this tool again with the same arguments.
+
+        You do NOT need to do anything manually about access.
+
+        ===========================================================
+        INPUTS
+        ===========================================================
+
+        - issue_description (required) — Your one-line paraphrase of the issue, ALWAYS IN ENGLISH (e.g. "Page styles broken — self-help publish + theme.liquid include did not resolve").
+        - editor_links (required, array) — Every PageFly editor URL the user pasted for the broken page(s). Include all of them. No placeholders.
+        - user_consented_to_publish (required) — Boolean. Must be TRUE. The user has explicitly agreed that the technical team may publish the page(s) after fixing. Ask first if you have not.
+        - ticket_url (optional) — Only include if your runtime exposes the live Crisp conversation URL.
+        - crisp_session_id (optional but STRONGLY recommended).
+        - customer_last_message_text (optional but STRONGLY recommended) — Verbatim copy of user's last text message. KHÔNG paraphrase, KHÔNG translate, KHÔNG fix typo.
+
+        ===========================================================
+        WHAT YOU MUST DO
+        ===========================================================
+
+        STEP 1 — SELF-HELP SCRIPT (walk through BEFORE calling the tool).
+
+        1a) Ask: "Bạn có thay đổi theme gần đây không?"
+
+        1b) IF user changed theme — say:
+        "Khi đổi theme, các page PageFly thường tự động publish lại, nhưng đôi khi một vài page bị lỗi nên không tự publish được — style mới sẽ không apply lên theme mới và gây broken. Bạn vào PageFly editor → publish lại các page đang lỗi → kiểm tra lại giúp mình nhé."
+
+        1c) IF user did NOT change theme — say:
+        "Bạn thử vào PageFly editor → publish lại trang đang lỗi → kiểm tra lại xem đã hoạt động chưa nhé."
+
+        1d) IF user reports still broken after publish — say:
+        "Bạn vào Shopify admin → Online Store → Themes → Edit code → mở file layout/theme.liquid → thêm dòng {% include 'pagefly-app-header' %} ngay TRƯỚC thẻ </head> → Save → kiểm tra lại trang giúp mình nhé."
+
+        1e) IF user reports still broken after the theme.liquid edit → proceed to STEP 2.
+
+        STEP 2 — Self-help failed. Collect:
+        a) Editor link(s) for the broken page(s). Ask: "Bạn gửi mình link editor của (các) trang đang lỗi nhé. Nếu nhiều trang bị lỗi cùng lúc thì gửi hết giúp mình."
+        b) Publish consent. Ask: "Khi team kỹ thuật fix xong, mình publish trang lên cho bạn nhé? (cần publish để áp dụng fix)"
+
+        STEP 3 — Have editor_links + user said YES to publish.
+        a) Call escalate_page_broken_issue with: issue_description (English), editor_links (array), user_consented_to_publish=true. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text.
+        b) Inspect the response:
+           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Do NOT post any extra note. Wait for the customer to confirm access has been granted, then call this tool again.
+           - If note_posted === true → reply with next_step_for_user verbatim.
+           - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why.
+
+        ===========================================================
+        OUTPUT HANDLING
+        ===========================================================
+
+        - is_ready_for_escalation === false → Do NOT post any note. Ask the user for what is listed in missing_info, using next_step_for_user as your reply.
+        - is_ready_for_escalation === true AND note_posted === true → Tool already posted. Reply with next_step_for_user.
+        - is_ready_for_escalation === true AND note_posted === false → Reply with next_step_for_user. If you can post a Crisp private note natively, post crisp_note.content unchanged.
+
+        ===========================================================
+        LANGUAGE OF YOUR REPLY TO THE USER
+        ===========================================================
+
+        next_step_for_user is already in the customer's language. Reply with it VERBATIM — do NOT translate it again, do NOT paraphrase. The STEP 1 self-help script above is written in Vietnamese as a default; if the customer chats in another language, adapt the wording naturally while preserving the technical instructions (file names, code snippet {% include 'pagefly-app-header' %}, paths). crisp_note.content is always English — it is for the TS team.
+
+        ===========================================================
+        EXACT NOTE FORMAT (do not change)
+        ===========================================================
+
+        Issue: <issue_description>, editor: <editor_link_1>[, <editor_link_2>, ...]
+        Ticket: <ticket_url or "(unknown)" if omitted>
+        Allowed to publish (user consented)
+      `,
+      inputSchema: ESCALATE_PAGE_BROKEN_INPUT_SHAPE,
+      outputSchema: ESCALATE_PAGE_BROKEN_OUTPUT_SHAPE,
+    },
+    async (input: EscalatePageBrokenInput) => {
+      const output: EscalatePageBrokenOutput = await escalatePageBrokenIssueHandler(input);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(output, null, 2),
+          },
+        ],
+        structuredContent: output,
+      };
+    }
+  );
+}
+
+/**************************************************************************
+ * EXPORTS
+ ***************************************************************************/
+
+export { registerEscalatePageBrokenIssueTool };
