@@ -134,6 +134,25 @@ test("formatCartNoteContent: silently drops placeholder screenshot", () => {
   assert.ok(!note.includes("screenshot"));
 });
 
+test("cart handler: user_exited_editor=false → missing editor_exit", async () => {
+  // Access stubbed ready + all info present + consent=true → reaches the
+  // new editor-exit gate, which short-circuits with missing_info ['editor_exit'].
+  const out = await escalateCartDrawerIssueHandler(
+    {
+      issue_description: "Cart drawer does not open on ATC click",
+      editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+      live_preview_url: "https://store.myshopify.com/products/test",
+      user_exited_editor: false,
+    },
+    stubAccessReady
+  );
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.equal(out.note_posted, false);
+  assert.equal(out.crisp_note.content, "");
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
+});
+
 test("cart handler: missing crisp_session_id triggers access-pending output", async () => {
   const out = await escalateCartDrawerIssueHandler({
     issue_description: "Cart drawer does not open on ATC click",

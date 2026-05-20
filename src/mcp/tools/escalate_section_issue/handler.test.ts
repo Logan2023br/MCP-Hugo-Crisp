@@ -59,6 +59,7 @@ test("section: reference media is OPTIONAL — pass with editor+consent only", a
       issue_description: "Section issue",
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -96,6 +97,22 @@ test("section: missing-info fallback wraps with Vietnamese when customer chats V
 /**************************************************************************
  * ACCESS CHECK
  ***************************************************************************/
+
+test("section: user_exited_editor=false → missing editor_exit", async () => {
+  const out = await escalateSectionIssueHandler(
+    {
+      issue_description: "Section stuck loading",
+      editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+      user_consented_to_publish: true,
+      user_exited_editor: false,
+    },
+    stubAccessReady
+  );
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.equal(out.note_posted, false);
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
+});
 
 test("section: missing crisp_session_id triggers access-pending output", async () => {
   const out = await escalateSectionIssueHandler({

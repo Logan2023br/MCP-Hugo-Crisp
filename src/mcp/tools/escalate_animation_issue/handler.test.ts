@@ -164,6 +164,23 @@ test("animation handler: missing-info fallback wraps with Vietnamese template wh
  * ACCESS CHECK
  ***************************************************************************/
 
+test("animation handler: user_exited_editor=false → missing editor_exit", async () => {
+  const out = await escalateAnimationIssueHandler(
+    {
+      issue_description: "Wants parallax effect",
+      editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+      reference_urls: ["https://loom.com/share/abc"],
+      publish_status: "published",
+      user_exited_editor: false,
+    },
+    stubAccessReady
+  );
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.equal(out.note_posted, false);
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
+});
+
 test("animation handler: missing crisp_session_id triggers access-pending output", async () => {
   const out = await escalateAnimationIssueHandler({
     issue_description: "Animation issue",

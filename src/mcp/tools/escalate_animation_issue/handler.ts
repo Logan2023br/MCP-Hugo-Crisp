@@ -18,6 +18,7 @@ import {
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireStoreAccess } from "@/lib/store-access.js";
+import { requireEditorExit } from "@/lib/editor-exit.js";
 
 /**************************************************************************
  * CONSTANTS
@@ -135,6 +136,20 @@ async function escalateAnimationIssueHandler(
   const editorLink = input.editor_link as string;
   const validReferenceUrls = filterValidUrls(input.reference_urls);
   const hasFiles = input.customer_attached_files === true;
+
+  // Editor-exit gate. Customer must have exited PageFly editor.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateAnimationOutput;
+  }
 
   // The note (TS-facing) must always be English. Translate if Hugo passed Vietnamese.
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);

@@ -57,6 +57,12 @@ const ESCALATE_APPS_INPUT_SHAPE = z.object({
     .describe(
       "Verbatim text of user's LAST message in this conversation. Copy as-is — KHÔNG paraphrase, KHÔNG trim, KHÔNG fix typo, KHÔNG translate. Used to find the correct conversation when crisp_session_id is missing. Omit if the last message has no text content (e.g. attachment only)."
     ),
+
+  user_exited_editor: z
+    .boolean()
+    .describe(
+      "MUST be TRUE before escalation. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict so the technical team cannot work while the customer is still in the editor. Ask the customer first (see EDITOR EXIT section in tool description) and pass false until they confirm."
+    ),
 });
 
 type EscalateAppsInput = z.infer<typeof ESCALATE_APPS_INPUT_SHAPE>;
@@ -102,7 +108,7 @@ const ESCALATE_APPS_OUTPUT_SHAPE = z.object({
   missing_info: z
     .array(z.string())
     .describe(
-      "List of fields still missing. Possible values: 'editor_links', 'media_urls', 'publish_status'."
+      "List of fields still missing. Possible values: 'editor_links', 'media_urls', 'publish_status', 'editor_exit'."
     ),
 
   crisp_note: CRISP_NOTE.describe(

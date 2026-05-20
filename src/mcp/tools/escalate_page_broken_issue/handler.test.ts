@@ -97,6 +97,22 @@ test("page-broken: missing-info fallback wraps with Vietnamese when customer cha
  * ACCESS CHECK
  ***************************************************************************/
 
+test("page-broken: user_exited_editor=false → missing editor_exit", async () => {
+  const out = await escalatePageBrokenIssueHandler(
+    {
+      issue_description: "Pages broken",
+      editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
+      user_consented_to_publish: true,
+      user_exited_editor: false,
+    },
+    stubAccessReady
+  );
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.equal(out.note_posted, false);
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
+});
+
 test("page-broken: missing crisp_session_id triggers access-pending output", async () => {
   const out = await escalatePageBrokenIssueHandler({
     issue_description: "Page broken",

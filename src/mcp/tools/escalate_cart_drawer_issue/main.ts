@@ -71,6 +71,7 @@ function registerEscalateCartDrawerIssueTool(server: McpServer): void {
         - ticket_url (optional) — Only include if your runtime exposes the live Crisp conversation URL. Auto-built from crisp_session_id otherwise.
         - crisp_session_id (optional but STRONGLY recommended) — The Crisp session ID for THIS conversation. Include it if your runtime has access.
         - customer_last_message_text (optional but STRONGLY recommended) — Verbatim copy of user's last text message. KHÔNG paraphrase, KHÔNG translate, KHÔNG fix typo, KHÔNG trim. Omit if the last message had no text (e.g. attachment only).
+        - user_exited_editor (required) — Boolean. Must be TRUE before the tool can escalate. The customer has explicitly confirmed they have exited the PageFly editor. Ask the customer first (see EDITOR EXIT section below) and pass false until they confirm.
 
         ===========================================================
         WHAT YOU MUST DO
@@ -82,10 +83,14 @@ function registerEscalateCartDrawerIssueTool(server: McpServer): void {
 
         STEP 2 — User has provided only ONE piece. Ask for the missing one. Do not call the tool yet.
 
-        STEP 3 — User has provided BOTH editor link AND live preview link.
-        a) Call escalate_cart_drawer_issue with: issue_description, editor_link, live_preview_url. Include screenshot_url if user attached one. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text (verbatim copy of user's last text message) unless the user's last message had no text content.
+        STEP 3 — User has provided BOTH editor link AND live preview link. BEFORE calling the tool, ask the customer to EXIT the editor and WAIT for explicit confirmation:
+        Reply: "Vui lòng giúp chúng tôi thoát editor để Technical team truy cập và check giúp bạn, vì nếu bạn và chúng tôi trong 1 editor sẽ bị conflict và không thể lưu version mới nhất"
+
+        STEP 4 — After the customer has explicitly confirmed they have exited the editor:
+        a) Call escalate_cart_drawer_issue with: issue_description, editor_link, live_preview_url, user_exited_editor=true. Include screenshot_url if user attached one. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text (verbatim copy of user's last text message) unless the user's last message had no text content.
         b) Inspect the response:
            - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Do NOT post any extra note (tool already posted the @Logan request internally). Wait for the customer to confirm access has been granted, then call this tool again with the same arguments to proceed.
+           - If is_ready_for_escalation === false AND missing_info contains "editor_exit" → relay next_step_for_user verbatim. Wait for the customer to confirm they've exited the editor, then call this tool again with user_exited_editor=true.
            - If note_posted === true → reply with next_step_for_user verbatim. Do NOT also try to post the note yourself.
            - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why posting failed.
 

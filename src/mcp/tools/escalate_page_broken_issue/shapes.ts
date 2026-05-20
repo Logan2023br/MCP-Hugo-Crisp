@@ -50,6 +50,12 @@ const ESCALATE_PAGE_BROKEN_INPUT_SHAPE = z.object({
     .describe(
       "Verbatim text of the user's LAST message. KHÔNG paraphrase, KHÔNG trim, KHÔNG fix typo, KHÔNG translate. Used for hybrid session matching and for generating the customer-facing reply in their language."
     ),
+
+  user_exited_editor: z
+    .boolean()
+    .describe(
+      "MUST be TRUE before escalation. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict so the technical team cannot work while the customer is still in the editor. Ask the customer first and pass false until they confirm."
+    ),
 });
 
 type EscalatePageBrokenInput = z.infer<typeof ESCALATE_PAGE_BROKEN_INPUT_SHAPE>;
@@ -85,7 +91,7 @@ const ESCALATE_PAGE_BROKEN_OUTPUT_SHAPE = z.object({
   missing_info: z
     .array(z.string())
     .describe(
-      "List of fields still missing. Possible values: 'editor_links', 'user_consented_to_publish', 'store_access' (when tool is waiting for Shopify collaborator access)."
+      "List of fields still missing. Possible values: 'editor_links', 'user_consented_to_publish', 'store_access', 'editor_exit'."
     ),
 
   crisp_note: CRISP_NOTE,

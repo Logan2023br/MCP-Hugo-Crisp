@@ -64,6 +64,7 @@ function registerEscalatePageBrokenIssueTool(server: McpServer): void {
         - ticket_url (optional) — Only include if your runtime exposes the live Crisp conversation URL.
         - crisp_session_id (optional but STRONGLY recommended).
         - customer_last_message_text (optional but STRONGLY recommended) — Verbatim copy of user's last text message. KHÔNG paraphrase, KHÔNG translate, KHÔNG fix typo.
+        - user_exited_editor (required) — Boolean. Must be TRUE before the tool can escalate. The customer has explicitly confirmed they have exited the PageFly editor. Ask the customer first (see new STEP below) and pass false until they confirm.
 
         ===========================================================
         WHAT YOU MUST DO
@@ -88,10 +89,14 @@ function registerEscalatePageBrokenIssueTool(server: McpServer): void {
         a) Editor link(s) for the broken page(s). Ask: "Bạn gửi mình link editor của (các) trang đang lỗi nhé. Nếu nhiều trang bị lỗi cùng lúc thì gửi hết giúp mình."
         b) Publish consent. Ask: "Khi team kỹ thuật fix xong, mình publish trang lên cho bạn nhé? (cần publish để áp dụng fix)"
 
-        STEP 3 — Have editor_links + user said YES to publish.
-        a) Call escalate_page_broken_issue with: issue_description (English), editor_links (array), user_consented_to_publish=true. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text.
+        STEP 3 — Have editor_links + user said YES to publish. BEFORE calling the tool, ask the customer to EXIT the editor and WAIT for explicit confirmation:
+        Reply: "Vui lòng giúp chúng tôi thoát editor để Technical team truy cập và check giúp bạn, vì nếu bạn và chúng tôi trong 1 editor sẽ bị conflict và không thể lưu version mới nhất"
+
+        STEP 4 — After the customer has explicitly confirmed they have exited the editor:
+        a) Call escalate_page_broken_issue with: issue_description (English), editor_links (array), user_consented_to_publish=true, user_exited_editor=true. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text.
         b) Inspect the response:
-           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Do NOT post any extra note. Wait for the customer to confirm access has been granted, then call this tool again.
+           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Wait for the customer to confirm access has been granted, then call this tool again.
+           - If is_ready_for_escalation === false AND missing_info contains "editor_exit" → relay next_step_for_user verbatim. Wait for the customer to confirm they've exited, then call again with user_exited_editor=true.
            - If note_posted === true → reply with next_step_for_user verbatim.
            - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why.
 

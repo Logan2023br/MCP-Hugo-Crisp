@@ -50,11 +50,27 @@ test("speed-page: screenshot is OPTIONAL — pass with editor+consent only", asy
       issue_description: "Page speed",
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
+});
+
+test("speed-page: user_exited_editor=false → missing editor_exit", async () => {
+  const out = await escalateSpeedPageIssueHandler(
+    {
+      issue_description: "Page speed",
+      editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+      user_consented_to_publish: true,
+      user_exited_editor: false,
+    },
+    stubAccessReady
+  );
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
 });
 
 test("speed-page: missing-info fallback English default", async () => {

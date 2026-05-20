@@ -14,6 +14,7 @@ import {
   tryPostNoteWithScoring,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
+import { requireEditorExit } from "@/lib/editor-exit.js";
 
 /**************************************************************************
  * CONSTANTS
@@ -96,6 +97,21 @@ async function escalateAppsIssueHandler(
       note_post_error:
         "Not ready for escalation — Hugo MUST ask the user for the real editor link(s), image/video showing the issue, and publish status. Do NOT fabricate URLs or status values.",
     };
+  }
+
+  // Editor-exit gate. The customer must have exited the PageFly editor
+  // before TS can debug — concurrent editing causes a save conflict.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateAppsOutput;
   }
 
   // Use a representative editor URL + first media URL for hybrid session scoring.

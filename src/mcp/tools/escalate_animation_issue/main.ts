@@ -68,6 +68,7 @@ function registerEscalateAnimationIssueTool(server: McpServer): void {
         - ticket_url (optional) — Only include if your runtime exposes the live Crisp conversation URL. Auto-built from crisp_session_id otherwise.
         - crisp_session_id (optional but STRONGLY recommended) — The Crisp session ID for THIS conversation.
         - customer_last_message_text (optional but STRONGLY recommended) — Verbatim copy of user's last text message. KHÔNG paraphrase, KHÔNG translate, KHÔNG fix typo, KHÔNG trim.
+        - user_exited_editor (required) — Boolean. Must be TRUE before the tool can escalate. The customer has explicitly confirmed they have exited the PageFly editor. Ask the customer first (see new STEP below) and pass false until they confirm.
 
         ===========================================================
         WHAT YOU MUST DO
@@ -83,10 +84,14 @@ function registerEscalateAnimationIssueTool(server: McpServer): void {
 
         STEP 2 — User has provided only part of the info. Ask politely for the remaining items. Do not call the tool yet.
 
-        STEP 3 — User has provided editor_link + (at least one reference URL OR attached files) + publish_status answer.
-        a) Call escalate_animation_issue with all collected fields. If the user attached files in chat, set customer_attached_files=true (and reference_urls may be empty/omitted). If the user only pasted links, include them in reference_urls and omit customer_attached_files.
+        STEP 3 — User has provided editor_link + (at least one reference URL OR attached files) + publish_status answer. BEFORE calling the tool, ask the customer to EXIT the editor and WAIT for explicit confirmation:
+        Reply: "Vui lòng giúp chúng tôi thoát editor để Technical team truy cập và check giúp bạn, vì nếu bạn và chúng tôi trong 1 editor sẽ bị conflict và không thể lưu version mới nhất"
+
+        STEP 4 — After the customer has explicitly confirmed they have exited the editor:
+        a) Call escalate_animation_issue with all collected fields + user_exited_editor=true. If the user attached files in chat, set customer_attached_files=true (and reference_urls may be empty/omitted). If the user only pasted links, include them in reference_urls and omit customer_attached_files.
         b) Inspect the response:
-           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Do NOT post any extra note (tool already posted the @Logan request internally). Wait for the customer to confirm access has been granted, then call this tool again.
+           - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Wait for the customer to confirm access has been granted, then call this tool again.
+           - If is_ready_for_escalation === false AND missing_info contains "editor_exit" → relay next_step_for_user verbatim. Wait for the customer to confirm they've exited the editor, then call again with user_exited_editor=true.
            - If note_posted === true → reply with next_step_for_user verbatim. Do NOT also try to post the note yourself.
            - If note_posted === false → reply with next_step_for_user. If you have native ability to post a Crisp private note, post crisp_note.content. note_post_error explains why posting failed.
 

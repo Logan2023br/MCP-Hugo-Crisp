@@ -70,6 +70,8 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
 
         - customer_last_message_text (optional but STRONGLY recommended) — Copy nguyên xi tin nhắn CUỐI CÙNG của user trong conversation này. KHÔNG paraphrase, KHÔNG dịch, KHÔNG sửa typo, KHÔNG trim. Tool dùng text này để tìm đúng conversation khi crisp_session_id không có. Bỏ qua field này nếu tin nhắn cuối là attachment/file (không có text).
 
+        - user_exited_editor (required) — Boolean. Must be TRUE before the tool can escalate. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict so the technical team cannot work while the customer is still in the editor. Ask the customer first (see STEP 4 below) and pass false until they confirm.
+
         ===========================================================
         WHAT YOU MUST DO
         ===========================================================
@@ -83,11 +85,14 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
         STEP 3 — User has provided only ONE piece (only screenshot, or only editor link).
         Ask for the missing one. Do not call the tool yet.
 
-        STEP 4 — User has provided BOTH a screenshot URL AND an editor link.
-        a) Call escalate_scroll_issue with: issue_description, editor_link, screenshot_url. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text (verbatim copy of user's last text message) unless the user's last message had no text content.
+        STEP 4 — User has provided BOTH a screenshot URL AND an editor link. Ask the user to EXIT the editor (concurrent-editing conflict prevention) and WAIT for explicit confirmation:
+        Reply: "Vui lòng giúp chúng tôi thoát editor để Technical team truy cập và check giúp bạn, vì nếu bạn và chúng tôi trong 1 editor sẽ bị conflict và không thể lưu version mới nhất"
+
+        STEP 5 — After the user has explicitly confirmed they have exited the editor, call escalate_scroll_issue with: issue_description, editor_link, screenshot_url, user_exited_editor=true. Include ticket_url and crisp_session_id if you have them. ALWAYS include customer_last_message_text (verbatim copy of user's last text message) unless the user's last message had no text content.
         b) Inspect the response:
-           - If note_posted === true → the tool already posted the private note for you. You only need to reply to the user with next_step_for_user verbatim. Do NOT also try to post the note yourself; that would create a duplicate.
-           - If note_posted === false → the tool could not post the note (no session ID or API failure). Reply to the user with next_step_for_user anyway, then if you have a way to post a private note natively, post crisp_note.content. The note_post_error field explains why posting failed.
+           - If is_ready_for_escalation === false AND missing_info contains "editor_exit" → relay next_step_for_user verbatim. Do NOT post any note. Wait for the customer to confirm they've exited the editor, then call this tool again with user_exited_editor=true.
+           - If note_posted === true → the tool already posted the private note for you. Reply to the user with next_step_for_user verbatim. Do NOT also try to post the note yourself; that would create a duplicate.
+           - If note_posted === false → the tool could not post the note (no session ID or API failure). Reply with next_step_for_user. If you have a way to post a private note natively, post crisp_note.content. The note_post_error field explains why posting failed.
 
         ===========================================================
         ACCEPTING SCREENSHOTS — DO NOT REJECT

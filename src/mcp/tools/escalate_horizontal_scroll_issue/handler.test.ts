@@ -54,11 +54,27 @@ test("hscroll: screenshot is OPTIONAL — pass with editor+publish only", async 
       issue_description: "Horizontal scroll",
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
+});
+
+test("hscroll: user_exited_editor=false → missing editor_exit", async () => {
+  const out = await escalateHorizontalScrollIssueHandler(
+    {
+      issue_description: "Horizontal scroll",
+      editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+      publish_status: "published",
+      user_exited_editor: false,
+    },
+    stubAccessReady
+  );
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
 });
 
 test("hscroll: missing-info fallback uses English by default", async () => {

@@ -52,6 +52,12 @@ const ESCALATE_SCROLL_INPUT_SHAPE = z.object({
     .describe(
       "Verbatim text của tin nhắn CUỐI CÙNG mà user gửi trong cuộc hội thoại này. Copy nguyên xi — KHÔNG paraphrase, KHÔNG trim, KHÔNG sửa typo, KHÔNG dịch. Tool dùng text này để tìm đúng conversation khi crisp_session_id không có. Bỏ qua field này nếu tin nhắn cuối là attachment/file (không có text)."
     ),
+
+  user_exited_editor: z
+    .boolean()
+    .describe(
+      "MUST be TRUE before escalation. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict, so the technical team cannot work while the customer is still inside the editor. If the customer has not yet been asked / has not yet confirmed, ask them first (see STEP 4 in tool description) and pass false until they confirm."
+    ),
 });
 
 type EscalateScrollInput = z.infer<typeof ESCALATE_SCROLL_INPUT_SHAPE>;
@@ -101,7 +107,7 @@ const ESCALATE_SCROLL_OUTPUT_SHAPE = z.object({
   missing_info: z
     .array(z.string())
     .describe(
-      "List of fields still missing. Possible values: 'screenshot', 'editor_link', 'ticket_url'. Empty when ready."
+      "List of fields still missing. Possible values: 'screenshot', 'editor_link', 'ticket_url', 'editor_exit'. Empty when ready."
     ),
 
   crisp_note: CRISP_NOTE.describe(

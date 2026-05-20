@@ -15,6 +15,7 @@ import {
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireStoreAccess } from "@/lib/store-access.js";
+import { requireEditorExit } from "@/lib/editor-exit.js";
 
 /**************************************************************************
  * CONSTANTS
@@ -116,6 +117,21 @@ async function escalateCartDrawerIssueHandler(
     input.screenshot_url && !looksLikePlaceholder(input.screenshot_url)
       ? input.screenshot_url
       : undefined;
+
+  // Editor-exit gate. The customer must have exited the PageFly editor
+  // before TS can debug — concurrent editing causes a save conflict.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateCartDrawerOutput;
+  }
 
   // The note (TS-facing) must always be English. Translate if Hugo passed Vietnamese.
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);

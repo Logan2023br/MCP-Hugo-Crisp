@@ -62,6 +62,7 @@ function registerEscalateHorizontalScrollIssueTool(server: McpServer): void {
         - ticket_url (optional)
         - crisp_session_id (optional but STRONGLY recommended)
         - customer_last_message_text (optional but STRONGLY recommended) — Verbatim user message.
+        - user_exited_editor (required) — Boolean. Must be TRUE before the tool can escalate. The customer has explicitly confirmed they have exited the PageFly editor. Ask the customer first (see new STEP below) and pass false until they confirm.
 
         ===========================================================
         WHAT YOU MUST DO
@@ -86,10 +87,14 @@ function registerEscalateHorizontalScrollIssueTool(server: McpServer): void {
         b) Evidence (OPTIONAL but helpful): "Nếu được, bạn gửi mình một ảnh hoặc video ngắn cho thấy việc page bị scroll trái phải — bạn có thể paste link hoặc gửi file đính kèm trực tiếp trong chat cũng được."
         c) Publish consent: "Khi team kỹ thuật fix xong, mình publish luôn trang lên hay bạn muốn mình chỉ save thôi?"
 
-        STEP 3 — Have editor_link + publish_status answer. Screenshot optional.
-        a) Call escalate_horizontal_scroll_issue with: issue_description (English, mention CSS snippet already tried), editor_link, publish_status. If user pasted screenshot URLs include them in screenshot_urls. If user attached files directly in chat set customer_attached_files=true. ALWAYS include customer_last_message_text.
+        STEP 3 — Have editor_link + publish_status answer. Screenshot optional. BEFORE calling the tool, ask the customer to EXIT the editor and WAIT for explicit confirmation:
+        Reply: "Vui lòng giúp chúng tôi thoát editor để Technical team truy cập và check giúp bạn, vì nếu bạn và chúng tôi trong 1 editor sẽ bị conflict và không thể lưu version mới nhất"
+
+        STEP 4 — After the customer has explicitly confirmed they have exited the editor:
+        a) Call escalate_horizontal_scroll_issue with: issue_description (English, mention CSS snippet already tried), editor_link, publish_status, user_exited_editor=true. If user pasted screenshot URLs include them in screenshot_urls. If user attached files directly in chat set customer_attached_files=true. ALWAYS include customer_last_message_text.
         b) Inspect the response:
            - If is_ready_for_escalation === false AND missing_info contains "store_access" → relay next_step_for_user verbatim. Wait for the customer to confirm access has been granted, then call again with the same arguments.
+           - If is_ready_for_escalation === false AND missing_info contains "editor_exit" → relay next_step_for_user verbatim. Wait for the customer to confirm they've exited, then call again with user_exited_editor=true.
            - If note_posted === true → reply with next_step_for_user verbatim.
            - If note_posted === false → reply with next_step_for_user. If you can post a Crisp private note natively, post crisp_note.content. note_post_error explains why.
 

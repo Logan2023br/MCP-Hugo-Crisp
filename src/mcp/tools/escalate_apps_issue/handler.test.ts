@@ -120,6 +120,23 @@ test("apps handler: missing-info fallback uses Vietnamese when customer chats Vi
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
 
+test("apps handler: user_exited_editor=false → missing editor_exit", async () => {
+  // Apps tool does not gate on store access, so when all info is present
+  // but user_exited_editor is not true, the editor-exit gate fires.
+  const out = await escalateAppsIssueHandler({
+    issue_description: "App bundle không show",
+    editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
+    media_urls: ["https://prnt.sc/abc"],
+    publish_status: "published",
+    user_exited_editor: false,
+  });
+  assert.equal(out.is_ready_for_escalation, false);
+  assert.deepEqual(out.missing_info, ["editor_exit"]);
+  assert.equal(out.note_posted, false);
+  assert.equal(out.crisp_note.content, "");
+  assert.match(out.next_step_for_user, /(thoát editor|exit the PageFly editor)/);
+});
+
 import { formatAppsNoteContent } from "./handler.ts";
 
 test("formatAppsNoteContent: single editor + single media + published", () => {

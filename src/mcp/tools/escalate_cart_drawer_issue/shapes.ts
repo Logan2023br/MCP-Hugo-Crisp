@@ -59,6 +59,12 @@ const ESCALATE_CART_DRAWER_INPUT_SHAPE = z.object({
     .describe(
       "Verbatim text of the user's LAST message in this conversation. Copy as-is — KHÔNG paraphrase, KHÔNG trim, KHÔNG fix typo, KHÔNG translate. Used to find the correct conversation when crisp_session_id is missing. Omit if the last message has no text content (e.g. attachment only)."
     ),
+
+  user_exited_editor: z
+    .boolean()
+    .describe(
+      "MUST be TRUE before escalation. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict, so the technical team cannot work while the customer is still inside the editor. Ask the customer first (see STEP in tool description) and pass false until they confirm."
+    ),
 });
 
 type EscalateCartDrawerInput = z.infer<typeof ESCALATE_CART_DRAWER_INPUT_SHAPE>;
@@ -108,7 +114,7 @@ const ESCALATE_CART_DRAWER_OUTPUT_SHAPE = z.object({
   missing_info: z
     .array(z.string())
     .describe(
-      "List of fields still missing. Possible values: 'editor_link', 'live_preview_url', 'store_access' (when the tool is waiting for the customer to grant Shopify collaborator access — relay next_step_for_user verbatim and wait for the customer to confirm). screenshot is optional and never blocks escalation."
+      "List of fields still missing. Possible values: 'editor_link', 'live_preview_url', 'store_access' (when the tool is waiting for the customer to grant Shopify collaborator access — relay next_step_for_user verbatim and wait for the customer to confirm), 'editor_exit' (when the tool is waiting for the customer to confirm they have exited the PageFly editor — relay next_step_for_user verbatim and wait, then call again with user_exited_editor=true). screenshot is optional and never blocks escalation."
     ),
 
   crisp_note: CRISP_NOTE.describe(

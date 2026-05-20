@@ -164,7 +164,11 @@ async function translateAccessInstructions(
  * CUSTOMER REPLY GENERATOR — multi-language, intent-driven
  ***************************************************************************/
 
-type CustomerReplyIntent = "missing_info" | "wait_message" | "access_pending";
+type CustomerReplyIntent =
+  | "missing_info"
+  | "wait_message"
+  | "access_pending"
+  | "editor_exit";
 
 interface GenerateCustomerReplyArgs {
   intent: CustomerReplyIntent;
@@ -196,6 +200,12 @@ const REPLY_INTENT_SYSTEM: Record<CustomerReplyIntent, string> = {
     "CONTEXT: To investigate the customer's issue, the technical team needs " +
     "access to their Shopify store. The team is currently requesting that " +
     "access. Tell the customer to wait a moment while access is being requested.",
+  editor_exit:
+    "CONTEXT: Before the technical team can debug the customer's PageFly page, " +
+    "the customer must first exit the PageFly editor — concurrent editing " +
+    "creates a save conflict so the latest version cannot be preserved. Politely " +
+    "ask the customer to exit the editor and confirm once done. State the reason " +
+    "(save conflict) in one short sentence.",
 };
 
 function buildReplyUserMessage(args: GenerateCustomerReplyArgs): string {

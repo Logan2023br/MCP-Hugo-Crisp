@@ -64,6 +64,12 @@ const ESCALATE_SCROLL_SECTION_INPUT_SHAPE = z.object({
     .describe(
       "Verbatim text of the user's LAST message. KHÔNG paraphrase, KHÔNG trim, KHÔNG fix typo, KHÔNG translate."
     ),
+
+  user_exited_editor: z
+    .boolean()
+    .describe(
+      "MUST be TRUE before escalation. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict. Ask the customer first and pass false until they confirm."
+    ),
 });
 
 type EscalateScrollSectionInput = z.infer<typeof ESCALATE_SCROLL_SECTION_INPUT_SHAPE>;
@@ -95,7 +101,7 @@ const ESCALATE_SCROLL_SECTION_OUTPUT_SHAPE = z.object({
   missing_info: z
     .array(z.string())
     .describe(
-      "List of fields still missing. Possible values: 'editor_link', 'user_consented_to_publish', 'store_access'."
+      "List of fields still missing. Possible values: 'editor_link', 'user_consented_to_publish', 'store_access', 'editor_exit'."
     ),
 
   crisp_note: CRISP_NOTE,
