@@ -77,19 +77,6 @@ async function escalateStickyIssueHandler(
   input: EscalateStickyInput,
   accessChecker: AccessChecker = requireStoreAccess
 ): Promise<EscalateStickyOutput> {
-  // Editor-exit gate FIRST.
-  const editorExit = await requireEditorExit(
-    input.user_exited_editor,
-    input.customer_last_message_text
-  );
-  if (!editorExit.ready) {
-    return {
-      issue_summary:
-        "Need confirmation that the customer has exited the editor before escalating.",
-      session_match: undefined,
-      ...editorExit.output,
-    } as EscalateStickyOutput;
-  }
 
   const access = await accessChecker(
     input.crisp_session_id ?? "",
@@ -100,6 +87,23 @@ async function escalateStickyIssueHandler(
       issue_summary: "Need Shopify store access before escalating to the technical team.",
       session_match: undefined,
       ...access.output,
+    } as EscalateStickyOutput;
+  }
+
+  // Editor-exit gate. Customer must have exited the PageFly editor
+  // before TS starts work. Asked AFTER access is granted (granting access
+  // doesn't require leaving the editor; exiting matters only when TS is
+  // about to debug).
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
     } as EscalateStickyOutput;
   }
 

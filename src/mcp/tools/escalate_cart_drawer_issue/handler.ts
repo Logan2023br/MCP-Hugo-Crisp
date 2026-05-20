@@ -68,22 +68,6 @@ async function escalateCartDrawerIssueHandler(
   input: EscalateCartDrawerInput,
   accessChecker: AccessChecker = requireStoreAccess
 ): Promise<EscalateCartDrawerOutput> {
-  // Editor-exit gate FIRST. From Hugo's conversation perspective, asking
-  // the customer to exit the editor happens BEFORE the access flow — if TS
-  // is about to request collaborator access, the customer should already be
-  // out of the editor to avoid save conflicts.
-  const editorExit = await requireEditorExit(
-    input.user_exited_editor,
-    input.customer_last_message_text
-  );
-  if (!editorExit.ready) {
-    return {
-      issue_summary:
-        "Need confirmation that the customer has exited the editor before escalating.",
-      session_match: undefined,
-      ...editorExit.output,
-    } as EscalateCartDrawerOutput;
-  }
 
   // Check Shopify store access. Cart drawer issues almost always need TS
   // to debug theme code; surface the access requirement before collecting
@@ -97,6 +81,23 @@ async function escalateCartDrawerIssueHandler(
       issue_summary: "Need Shopify store access before escalating to the technical team.",
       session_match: undefined,
       ...access.output,
+    } as EscalateCartDrawerOutput;
+  }
+
+  // Editor-exit gate. Customer must have exited the PageFly editor
+  // before TS starts work. Asked AFTER access is granted (granting access
+  // doesn't require leaving the editor; exiting matters only when TS is
+  // about to debug).
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
     } as EscalateCartDrawerOutput;
   }
 
