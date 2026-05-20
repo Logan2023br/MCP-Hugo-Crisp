@@ -51,6 +51,23 @@ function formatNoteContent(fields: NoteFields, ticketUrl: string): string {
 async function escalateScrollIssueHandler(
   input: EscalateScrollInput
 ): Promise<EscalateScrollOutput> {
+  // Editor-exit gate FIRST. From Hugo's conversation perspective,
+  // asking the customer to exit the editor happens BEFORE the access
+  // flow — if TS is about to request collaborator access, the customer
+  // should already be out of the editor to avoid save conflicts.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateScrollOutput;
+  }
+
   const missing: MissingField[] = [];
 
   if (!input.screenshot_url) missing.push("screenshot");
@@ -87,21 +104,6 @@ async function escalateScrollIssueHandler(
   // Past the missing-info gate above, both fields are guaranteed present.
   const screenshotUrl = input.screenshot_url as string;
   const editorLink = input.editor_link as string;
-
-  // Editor-exit gate. The customer must have exited the PageFly editor
-  // before TS can debug — concurrent editing causes a save conflict.
-  const editorExit = await requireEditorExit(
-    input.user_exited_editor,
-    input.customer_last_message_text
-  );
-  if (!editorExit.ready) {
-    return {
-      issue_summary:
-        "Need confirmation that the customer has exited the editor before escalating.",
-      session_match: undefined,
-      ...editorExit.output,
-    } as EscalateScrollOutput;
-  }
 
   // The note (TS-facing) must always be English. Translate if Hugo passed Vietnamese.
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);

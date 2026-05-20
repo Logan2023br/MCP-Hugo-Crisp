@@ -21,6 +21,7 @@ test("animation handler: missing editor_link → missing_info includes editor_li
       editor_link: undefined as unknown as string,
       reference_urls: ["https://loom.com/share/abc"],
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -37,6 +38,7 @@ test("animation handler: placeholder editor_link → treated as missing", async 
       editor_link: "https://YOUR_STORE.myshopify.com/admin/apps/pagefly",
       reference_urls: ["https://loom.com/share/abc"],
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -51,6 +53,7 @@ test("animation handler: no reference URLs and no files → missing reference", 
       reference_urls: undefined,
       customer_attached_files: undefined,
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -65,6 +68,7 @@ test("animation handler: empty reference_urls + no files → missing reference",
       reference_urls: [],
       customer_attached_files: false,
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -79,6 +83,7 @@ test("animation handler: only placeholder reference_urls + no files → missing 
       reference_urls: ["https://YOUR_STORE.myshopify.com/x", "https://dummyimage.com/600"],
       customer_attached_files: false,
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -93,6 +98,7 @@ test("animation handler: customer_attached_files=true alone is enough for refere
       reference_urls: undefined,
       customer_attached_files: true,
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -106,6 +112,7 @@ test("animation handler: missing publish_status → missing", async () => {
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       reference_urls: ["https://loom.com/share/abc"],
       publish_status: undefined as unknown as "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -120,6 +127,7 @@ test("animation handler: multiple fields missing → all in missing_info", async
       reference_urls: [],
       customer_attached_files: false,
       publish_status: undefined as unknown as "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -135,6 +143,7 @@ test("animation handler: missing-info fallback uses English by default", async (
       editor_link: undefined as unknown as string,
       reference_urls: [],
       publish_status: undefined as unknown as "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -152,6 +161,7 @@ test("animation handler: missing-info fallback wraps with Vietnamese template wh
       reference_urls: [],
       publish_status: undefined as unknown as "published",
       customer_last_message_text: "Mình muốn làm hiệu ứng giống trang này",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -188,6 +198,7 @@ test("animation handler: missing crisp_session_id triggers access-pending output
     reference_urls: ["https://loom.com/share/abc"],
     publish_status: "published",
     // intentionally NO crisp_session_id — access check should short-circuit
+    user_exited_editor: true,
   });
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("store_access"));

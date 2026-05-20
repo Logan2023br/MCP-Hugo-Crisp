@@ -13,6 +13,7 @@ test("speed-page: missing editor_link → missing", async () => {
       issue_description: "Page loads slowly",
       editor_link: undefined as unknown as string,
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -26,6 +27,7 @@ test("speed-page: placeholder editor_link → missing", async () => {
       issue_description: "Page speed",
       editor_link: "https://YOUR_STORE.myshopify.com/admin",
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -38,6 +40,7 @@ test("speed-page: user_consented_to_publish false → missing consent", async ()
       issue_description: "Page speed",
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -79,6 +82,7 @@ test("speed-page: missing-info fallback English default", async () => {
       issue_description: "Page speed",
       editor_link: undefined as unknown as string,
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -93,6 +97,7 @@ test("speed-page: missing-info fallback Vietnamese wrapper when customer chats V
       editor_link: undefined as unknown as string,
       user_consented_to_publish: false,
       customer_last_message_text: "Page của mình load chậm quá",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -104,6 +109,7 @@ test("speed-page: missing crisp_session_id triggers access-pending output", asyn
     issue_description: "Page speed",
     editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
     user_consented_to_publish: true,
+    user_exited_editor: true,
   });
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("store_access"));

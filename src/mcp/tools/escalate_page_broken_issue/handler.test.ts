@@ -17,6 +17,7 @@ test("page-broken: empty editor_links → missing editor_links", async () => {
       issue_description: "Multiple pages broken after theme switch",
       editor_links: [],
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -35,6 +36,7 @@ test("page-broken: only placeholder editor_links → missing editor_links", asyn
         "https://dummyimage.com/600",
       ],
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -47,6 +49,7 @@ test("page-broken: user_consented_to_publish false → missing consent", async (
       issue_description: "Page broken",
       editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -59,6 +62,7 @@ test("page-broken: both missing → both in missing_info", async () => {
       issue_description: "Page broken",
       editor_links: [],
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -72,6 +76,7 @@ test("page-broken: missing-info fallback uses English by default", async () => {
       issue_description: "Page broken",
       editor_links: [],
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -87,6 +92,7 @@ test("page-broken: missing-info fallback wraps with Vietnamese when customer cha
       editor_links: [],
       user_consented_to_publish: false,
       customer_last_message_text: "Trang của mình bị lỗi rồi",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -118,6 +124,7 @@ test("page-broken: missing crisp_session_id triggers access-pending output", asy
     issue_description: "Page broken",
     editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
     user_consented_to_publish: true,
+    user_exited_editor: true,
   });
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("store_access"));

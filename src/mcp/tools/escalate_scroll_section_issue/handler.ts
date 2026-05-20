@@ -74,6 +74,23 @@ async function escalateScrollSectionIssueHandler(
   input: EscalateScrollSectionInput,
   accessChecker: AccessChecker = requireStoreAccess
 ): Promise<EscalateScrollSectionOutput> {
+  // Editor-exit gate FIRST. From Hugo's conversation perspective,
+  // asking the customer to exit the editor happens BEFORE the access
+  // flow — if TS is about to request collaborator access, the customer
+  // should already be out of the editor to avoid save conflicts.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateScrollSectionOutput;
+  }
+
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text
@@ -114,20 +131,6 @@ async function escalateScrollSectionIssueHandler(
   const editorLink = input.editor_link as string;
   const validScreenshotUrls = filterValidUrls(input.screenshot_urls);
   const hasFiles = input.customer_attached_files === true;
-
-  // Editor-exit gate. Customer must have exited PageFly editor.
-  const editorExit = await requireEditorExit(
-    input.user_exited_editor,
-    input.customer_last_message_text
-  );
-  if (!editorExit.ready) {
-    return {
-      issue_summary:
-        "Need confirmation that the customer has exited the editor before escalating.",
-      session_match: undefined,
-      ...editorExit.output,
-    } as EscalateScrollSectionOutput;
-  }
 
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);
 

@@ -68,9 +68,26 @@ async function escalateCartDrawerIssueHandler(
   input: EscalateCartDrawerInput,
   accessChecker: AccessChecker = requireStoreAccess
 ): Promise<EscalateCartDrawerOutput> {
-  // Check Shopify store access first. Cart drawer issues almost always
-  // need TS to debug theme code; surface the access requirement before
-  // collecting other info.
+  // Editor-exit gate FIRST. From Hugo's conversation perspective, asking
+  // the customer to exit the editor happens BEFORE the access flow — if TS
+  // is about to request collaborator access, the customer should already be
+  // out of the editor to avoid save conflicts.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateCartDrawerOutput;
+  }
+
+  // Check Shopify store access. Cart drawer issues almost always need TS
+  // to debug theme code; surface the access requirement before collecting
+  // other info.
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text
@@ -117,21 +134,6 @@ async function escalateCartDrawerIssueHandler(
     input.screenshot_url && !looksLikePlaceholder(input.screenshot_url)
       ? input.screenshot_url
       : undefined;
-
-  // Editor-exit gate. The customer must have exited the PageFly editor
-  // before TS can debug — concurrent editing causes a save conflict.
-  const editorExit = await requireEditorExit(
-    input.user_exited_editor,
-    input.customer_last_message_text
-  );
-  if (!editorExit.ready) {
-    return {
-      issue_summary:
-        "Need confirmation that the customer has exited the editor before escalating.",
-      session_match: undefined,
-      ...editorExit.output,
-    } as EscalateCartDrawerOutput;
-  }
 
   // The note (TS-facing) must always be English. Translate if Hugo passed Vietnamese.
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);

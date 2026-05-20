@@ -74,6 +74,23 @@ async function escalateSectionIssueHandler(
   input: EscalateSectionInput,
   accessChecker: AccessChecker = requireStoreAccess
 ): Promise<EscalateSectionOutput> {
+  // Editor-exit gate FIRST. From Hugo's conversation perspective,
+  // asking the customer to exit the editor happens BEFORE the access
+  // flow — if TS is about to request collaborator access, the customer
+  // should already be out of the editor to avoid save conflicts.
+  const editorExit = await requireEditorExit(
+    input.user_exited_editor,
+    input.customer_last_message_text
+  );
+  if (!editorExit.ready) {
+    return {
+      issue_summary:
+        "Need confirmation that the customer has exited the editor before escalating.",
+      session_match: undefined,
+      ...editorExit.output,
+    } as EscalateSectionOutput;
+  }
+
   // Section/page render issues require TS to debug the live editor.
   // Surface access requirement before collecting other info.
   const access = await accessChecker(
@@ -116,20 +133,6 @@ async function escalateSectionIssueHandler(
   const editorLink = input.editor_link as string;
   const validReferenceUrls = filterValidUrls(input.reference_urls);
   const hasFiles = input.customer_attached_files === true;
-
-  // Editor-exit gate. Customer must have exited PageFly editor.
-  const editorExit = await requireEditorExit(
-    input.user_exited_editor,
-    input.customer_last_message_text
-  );
-  if (!editorExit.ready) {
-    return {
-      issue_summary:
-        "Need confirmation that the customer has exited the editor before escalating.",
-      session_match: undefined,
-      ...editorExit.output,
-    } as EscalateSectionOutput;
-  }
 
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);
 

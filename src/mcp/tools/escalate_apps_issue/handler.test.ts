@@ -8,6 +8,7 @@ test("apps handler: missing editor_links → missing_info includes editor_links"
     editor_links: undefined as unknown as string[],
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_links"));
@@ -21,6 +22,7 @@ test("apps handler: empty editor_links array → missing", async () => {
     editor_links: [],
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("editor_links"));
 });
@@ -34,6 +36,7 @@ test("apps handler: all editor_links are placeholders → missing", async () => 
     ],
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("editor_links"));
 });
@@ -44,6 +47,7 @@ test("apps handler: missing media_urls → missing", async () => {
     editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
     media_urls: undefined as unknown as string[],
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("media_urls"));
 });
@@ -54,6 +58,7 @@ test("apps handler: empty media_urls array → missing", async () => {
     editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
     media_urls: [],
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("media_urls"));
 });
@@ -64,6 +69,7 @@ test("apps handler: all media_urls are placeholders → missing", async () => {
     editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
     media_urls: ["https://dummyimage.com/600x400", "https://example.com/img.png"],
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("media_urls"));
 });
@@ -74,6 +80,7 @@ test("apps handler: missing publish_status → missing", async () => {
     editor_links: ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"],
     media_urls: ["https://prnt.sc/abc"],
     publish_status: undefined as unknown as "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("publish_status"));
 });
@@ -84,6 +91,7 @@ test("apps handler: multiple fields missing → all in missing_info", async () =
     editor_links: [],
     media_urls: [],
     publish_status: undefined as unknown as "published",
+    user_exited_editor: true,
   });
   assert.ok(out.missing_info.includes("editor_links"));
   assert.ok(out.missing_info.includes("media_urls"));
@@ -96,6 +104,7 @@ test("apps handler: missing-info fallback uses English when no customer text + n
     editor_links: [],
     media_urls: [],
     publish_status: undefined as unknown as "published",
+    user_exited_editor: true,
   });
   // No customer_last_message_text + tests run without ANTHROPIC_API_KEY →
   // helper falls through to English template.
@@ -111,6 +120,7 @@ test("apps handler: missing-info fallback uses Vietnamese when customer chats Vi
     media_urls: [],
     publish_status: undefined as unknown as "published",
     customer_last_message_text: "Mình bị lỗi app không hiển thị",
+    user_exited_editor: true,
   });
   // Tests run without ANTHROPIC_API_KEY → falls back to VI heuristic.
   // English labels are passed in; fallback wraps them in Vietnamese template.

@@ -17,6 +17,7 @@ test("theme-override: missing editor_link → missing", async () => {
       issue_description: "Theme font does not apply to PageFly",
       editor_link: undefined as unknown as string,
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -30,6 +31,7 @@ test("theme-override: placeholder editor_link → missing", async () => {
       issue_description: "Theme override",
       editor_link: "https://YOUR_STORE.myshopify.com/admin",
       user_consented_to_publish: true,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -42,6 +44,7 @@ test("theme-override: user_consented_to_publish false → missing consent", asyn
       issue_description: "Theme override",
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -83,6 +86,7 @@ test("theme-override: missing-info fallback uses English by default", async () =
       issue_description: "Theme override",
       editor_link: undefined as unknown as string,
       user_consented_to_publish: false,
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -97,6 +101,7 @@ test("theme-override: missing-info fallback wraps with Vietnamese when customer 
       editor_link: undefined as unknown as string,
       user_consented_to_publish: false,
       customer_last_message_text: "Font theme của mình không apply được vào PageFly",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -112,6 +117,7 @@ test("theme-override: missing crisp_session_id triggers access-pending output", 
     issue_description: "Theme override",
     editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
     user_consented_to_publish: true,
+    user_exited_editor: true,
   });
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("store_access"));

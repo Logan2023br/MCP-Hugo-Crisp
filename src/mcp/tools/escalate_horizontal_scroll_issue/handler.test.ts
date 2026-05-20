@@ -17,6 +17,7 @@ test("hscroll: missing editor_link → missing", async () => {
       issue_description: "Page scrolls horizontally on mobile",
       editor_link: undefined as unknown as string,
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -30,6 +31,7 @@ test("hscroll: placeholder editor_link → missing", async () => {
       issue_description: "Horizontal scroll",
       editor_link: "https://YOUR_STORE.myshopify.com/admin",
       publish_status: "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -42,6 +44,7 @@ test("hscroll: missing publish_status → missing", async () => {
       issue_description: "Horizontal scroll",
       editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
       publish_status: undefined as unknown as "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -83,6 +86,7 @@ test("hscroll: missing-info fallback uses English by default", async () => {
       issue_description: "Horizontal scroll",
       editor_link: undefined as unknown as string,
       publish_status: undefined as unknown as "published",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -97,6 +101,7 @@ test("hscroll: missing-info fallback wraps with Vietnamese when customer chats V
       editor_link: undefined as unknown as string,
       publish_status: undefined as unknown as "published",
       customer_last_message_text: "Page mình scroll trái phải được trên mobile",
+      user_exited_editor: true,
     },
     stubAccessReady
   );
@@ -112,6 +117,7 @@ test("hscroll: missing crisp_session_id triggers access-pending output", async (
     issue_description: "Horizontal scroll",
     editor_link: "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
     publish_status: "published",
+    user_exited_editor: true,
   });
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("store_access"));
