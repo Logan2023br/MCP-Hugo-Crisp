@@ -26,6 +26,7 @@ import { registerEscalateMissImageIssueTool } from "@/mcp/tools/escalate_miss_im
 import { registerEscalate404PageIssueTool } from "@/mcp/tools/escalate_404_page_issue/main.js";
 import { registerEscalateThemePageflyMissIssueTool } from "@/mcp/tools/escalate_themepagefly_miss_issue/main.js";
 import { registerEscalateApiIntegrationIssueTool } from "@/mcp/tools/escalate_api_integration_issue/main.js";
+import { registerEscalatePartnerIssueTool } from "@/mcp/tools/escalate_partner_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -55,6 +56,7 @@ function registerTools(server: McpServer): void {
   registerEscalate404PageIssueTool(server);
   registerEscalateThemePageflyMissIssueTool(server);
   registerEscalateApiIntegrationIssueTool(server);
+  registerEscalatePartnerIssueTool(server);
 }
 
 /**************************************************************************
