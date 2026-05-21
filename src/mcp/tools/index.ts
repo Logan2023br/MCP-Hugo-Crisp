@@ -31,6 +31,7 @@ import { registerEscalateVariantAbTestingIssueTool } from "@/mcp/tools/escalate_
 import { registerEscalateOverrideSectionThemeIssueTool } from "@/mcp/tools/escalate_override_section_theme_issue/main.js";
 import { registerEscalatePublishLiquidErrorIssueTool } from "@/mcp/tools/escalate_publish_liquid_error_issue/main.js";
 import { registerEscalateWhitePageIssueTool } from "@/mcp/tools/escalate_white_page_issue/main.js";
+import { registerEscalateLiveDifferentEditorIssueTool } from "@/mcp/tools/escalate_live_different_editor_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -65,6 +66,7 @@ function registerTools(server: McpServer): void {
   registerEscalateOverrideSectionThemeIssueTool(server);
   registerEscalatePublishLiquidErrorIssueTool(server);
   registerEscalateWhitePageIssueTool(server);
+  registerEscalateLiveDifferentEditorIssueTool(server);
 }
 
 /**************************************************************************
