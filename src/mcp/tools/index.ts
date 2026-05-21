@@ -28,6 +28,7 @@ import { registerEscalateThemePageflyMissIssueTool } from "@/mcp/tools/escalate_
 import { registerEscalateApiIntegrationIssueTool } from "@/mcp/tools/escalate_api_integration_issue/main.js";
 import { registerEscalatePartnerIssueTool } from "@/mcp/tools/escalate_partner_issue/main.js";
 import { registerEscalateVariantAbTestingIssueTool } from "@/mcp/tools/escalate_variant_abtesting_issue/main.js";
+import { registerEscalateOverrideSectionThemeIssueTool } from "@/mcp/tools/escalate_override_section_theme_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -59,6 +60,7 @@ function registerTools(server: McpServer): void {
   registerEscalateApiIntegrationIssueTool(server);
   registerEscalatePartnerIssueTool(server);
   registerEscalateVariantAbTestingIssueTool(server);
+  registerEscalateOverrideSectionThemeIssueTool(server);
 }
 
 /**************************************************************************
