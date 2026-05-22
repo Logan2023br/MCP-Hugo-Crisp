@@ -47,6 +47,7 @@ import { registerEscalateJsPageflyIssueTool } from "@/mcp/tools/escalate_js_page
 import { registerEscalateVideoNotAutoIssueTool } from "@/mcp/tools/escalate_video_not_auto_issue/main.js";
 import { registerEscalateElementNotShowIssueTool } from "@/mcp/tools/escalate_element_not_show_issue/main.js";
 import { registerEscalateBackgroundMobileIssueTool } from "@/mcp/tools/escalate_background_mobile_issue/main.js";
+import { registerEscalateProductNotAssignIssueTool } from "@/mcp/tools/escalate_product_not_assign_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -97,6 +98,7 @@ function registerTools(server: McpServer): void {
   registerEscalateVideoNotAutoIssueTool(server);
   registerEscalateElementNotShowIssueTool(server);
   registerEscalateBackgroundMobileIssueTool(server);
+  registerEscalateProductNotAssignIssueTool(server);
 }
 
 /**************************************************************************
