@@ -59,6 +59,7 @@ import { registerEscalateSourceRevertIssueTool } from "@/mcp/tools/escalate_sour
 import { registerEscalateImagePreviewIssueTool } from "@/mcp/tools/escalate_image_preview_issue/main.js";
 import { registerEscalateHeaderFooterIssueTool } from "@/mcp/tools/escalate_header_footer_issue/main.js";
 import { registerEscalateUnderlineIssueTool } from "@/mcp/tools/escalate_underline_issue/main.js";
+import { registerEscalateHerobannerIssueTool } from "@/mcp/tools/escalate_herobanner_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -121,6 +122,7 @@ function registerTools(server: McpServer): void {
   registerEscalateImagePreviewIssueTool(server);
   registerEscalateHeaderFooterIssueTool(server);
   registerEscalateUnderlineIssueTool(server);
+  registerEscalateHerobannerIssueTool(server);
 }
 
 /**************************************************************************
