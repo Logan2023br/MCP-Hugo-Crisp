@@ -37,6 +37,7 @@ import { registerEscalateRedirectCheckoutIssueTool } from "@/mcp/tools/escalate_
 import { registerEscalatePopupErrorIssueTool } from "@/mcp/tools/escalate_popup_error_issue/main.js";
 import { registerEscalateVariantMediaIssueTool } from "@/mcp/tools/escalate_variant_media_issue/main.js";
 import { registerEscalateEventButtonIssueTool } from "@/mcp/tools/escalate_event_button_issue/main.js";
+import { registerEscalateFormIssueTool } from "@/mcp/tools/escalate_form_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -77,6 +78,7 @@ function registerTools(server: McpServer): void {
   registerEscalatePopupErrorIssueTool(server);
   registerEscalateVariantMediaIssueTool(server);
   registerEscalateEventButtonIssueTool(server);
+  registerEscalateFormIssueTool(server);
 }
 
 /**************************************************************************
