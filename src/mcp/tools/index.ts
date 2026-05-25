@@ -66,6 +66,7 @@ import { registerEscalateFreeServiceIssueTool } from "@/mcp/tools/escalate_free_
 import { registerEscalateProductShowIssueTool } from "@/mcp/tools/escalate_product_show_issue/main.js";
 import { registerEscalateProductShowEditorIssueTool } from "@/mcp/tools/escalate_product_show_editor_issue/main.js";
 import { registerEscalateFullWidthIssueTool } from "@/mcp/tools/escalate_full_width_issue/main.js";
+import { registerEscalateScrollBarIssueTool } from "@/mcp/tools/escalate_scroll_bar_issue/main.js";
 
 /**************************************************************************
  * MAIN
@@ -135,6 +136,7 @@ function registerTools(server: McpServer): void {
   registerEscalateProductShowIssueTool(server);
   registerEscalateProductShowEditorIssueTool(server);
   registerEscalateFullWidthIssueTool(server);
+  registerEscalateScrollBarIssueTool(server);
 }
 
 /**************************************************************************
