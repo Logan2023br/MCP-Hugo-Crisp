@@ -37,7 +37,17 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
         META-RULE — HUGO MUST DRIVE THIS FLOW
         ===========================================================
 
-        This case is handled end-to-end by THIS MCP tool. DO NOT hand the conversation off to a human operator unless (a) the customer explicitly asks for a human, OR (b) the tool returns a fatal error you cannot resolve from the response payload. The MCP tool IS the response mechanism — your job is to drive it correctly, not to defer.
+        This case is handled end-to-end by THIS MCP tool. The MCP tool IS the response mechanism — your job is to drive it correctly, not to defer.
+
+        ABSOLUTELY DO NOT auto-transfer / handoff / "send to human" while this tool is in flight:
+          • If you are at ANY STEP of this tool's flow (delivering self-help, collecting info, calling the tool, relaying the response, waiting for customer reply) → CONTINUE the flow.
+          • Even if the customer's question seems complex or out of scope, complete the current MCP flow first. Defer any side-questions until the current flow finishes.
+          • Do NOT trigger Crisp "assign to operator", "transfer", or any auto-handoff action. Do NOT write replies that say "I will transfer you to a human."
+          • Auto-transfer mid-flow breaks the access-request / editor-exit / note-posting pipeline and creates duplicate work for the TS team.
+
+        ONLY hand off to a human when:
+          (a) the customer EXPLICITLY and clearly asks for a human operator ("I want to talk to a human", "please escalate to a person"), OR
+          (b) the tool returns a fatal error you cannot resolve from the response payload.
 
         SELF-CHECK BEFORE EVERY TURN:
           1. Read the customer's most recent message and identify which STEP of the flow below it answers.
