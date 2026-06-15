@@ -19,7 +19,7 @@ _To get started with this MCP server, you can either run it locally or use the h
 ### Using the hosted version
 
 This MCP server comes already hosted at and ready to be connected to your Crisp workspace if you wish to test it out quickly.
-You can access it at: https://crisp-mcp-demo.fly.dev/mcp
+You can access it at: https://crisp-mcp-server-v1.fly.dev/mcp
 
 ### Running locally
 
@@ -33,8 +33,8 @@ You can access it at: https://crisp-mcp-demo.fly.dev/mcp
 Open a terminal in your desired folder and run:
 
 ```sh
-git clone https://github.com/crisp-im/crisp-mcp-demo.git
-cd crisp-mcp-demo
+git clone https://github.com/crisp-im/crisp-mcp-server-v1.git
+cd crisp-mcp-server-v1
 ```
 
 #### Step 2 — Running the server
@@ -96,7 +96,7 @@ We recommend also checking out [our official documentation](https://docs.crisp.c
 
 ![Add MCP server](assets/add-mcp-server.png)
 
-#### Step 3 — Enter your MCP server's URL (either your hosted/tunneled URL our [hosted version](https://crisp-mcp-demo.fly.dev/mcp)) and hit **Add MCP Server**.
+#### Step 3 — Enter your MCP server's URL (either your hosted/tunneled URL our [hosted version](https://crisp-mcp-server-v1.fly.dev/mcp)) and hit **Add MCP Server**.
 
 ![Add MCP Now](assets/add-mcp-now.png)
 

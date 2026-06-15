@@ -80,3 +80,4 @@ test("requireEditorExit: note_post_error explains the gate", async () => {
     assert.match(result.output.note_post_error, /user_exited_editor=true/);
   }
 });
+

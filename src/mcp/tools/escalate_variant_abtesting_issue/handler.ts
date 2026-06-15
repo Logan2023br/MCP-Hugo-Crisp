@@ -7,6 +7,12 @@ import type {
   EscalateVariantAbTestingOutput,
 } from "@/mcp/tools/escalate_variant_abtesting_issue/shapes.js";
 import {
+  fetchCustomerTexts,
+  urlAppearsInMessages,
+  makeDedupKey,
+  validateEditorLink,
+  pickWrongEditorLinkMessage,
+  groundPublishConsent,
   filterValidUrls,
   formatReferenceMedia,
   looksLikePlaceholder,
@@ -72,12 +78,17 @@ type AccessChecker = typeof requireStoreAccess;
 
 async function escalateVariantAbTestingIssueHandler(
   input: EscalateVariantAbTestingInput,
-  accessChecker: AccessChecker = requireStoreAccess
+  accessChecker: AccessChecker = requireStoreAccess,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalateVariantAbTestingOutput> {
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+  const homepageProvidedByCustomer = urlAppearsInMessages(input.customer_homepage_url, customerTexts);
+
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text,
-    input.customer_homepage_url
+    input.customer_homepage_url,
+    homepageProvidedByCustomer
   );
   if (!access.ready) {
     return {
@@ -103,10 +114,27 @@ async function escalateVariantAbTestingIssueHandler(
   }
 
   const missing: MissingField[] = [];
-  if (!input.editor_link || looksLikePlaceholder(input.editor_link)) {
+  const editorStatus = validateEditorLink(input.editor_link, customerTexts);
+  if (editorStatus === "wrong_type") {
+    return {
+      issue_summary: "The link provided is not a PageFly editor link.",
+      is_ready_for_escalation: false,
+      missing_info: ["editor_link"],
+      crisp_note: { content: "", formatted_message: "" },
+      next_step_for_user: await pickWrongEditorLinkMessage(input.customer_last_message_text),
+      note_posted: false,
+      note_post_error:
+        "The customer's link is not a PageFly editor link (wrong type). Hugo must ask for the real editor link; do NOT escalate with a homepage/preview/admin link.",
+    };
+  }
+  if (editorStatus === "missing") {
     missing.push("editor_link");
   }
-  if (input.user_consented_to_publish !== true) {
+  const consent = await groundPublishConsent(
+    customerTexts,
+    input.user_consented_to_publish === true ? "publish" : undefined
+  );
+  if (consent === "unknown") {
     missing.push("user_consented_to_publish");
   }
 
@@ -135,19 +163,16 @@ async function escalateVariantAbTestingIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_variant_abtesting_issue", editorLink),
     fields: {
       issueDescription: issueDescriptionEn,
       editorLink,
       screenshotUrls: validScreenshotUrls,
       customerAttachedFiles: hasFiles,
-      userConsentedToPublish: input.user_consented_to_publish,
+      userConsentedToPublish: consent === "publish",
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl: validScreenshotUrls[0],
-      editorLink,
-    },
     formatNote: formatVariantAbTestingNoteContent,
   });
 

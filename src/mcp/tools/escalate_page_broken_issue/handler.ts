@@ -10,8 +10,14 @@ import {
   filterValidUrls,
   pickMissingInfoMessage,
   pickWaitMessage,
+  pickWrongEditorLinkMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  makeDedupKey,
+  urlAppearsInMessages,
+  isEditorLink,
+  groundPublishConsent,
+  fetchCustomerTexts,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireStoreAccess } from "@/lib/store-access.js";
@@ -62,15 +68,20 @@ type AccessChecker = typeof requireStoreAccess;
 
 async function escalatePageBrokenIssueHandler(
   input: EscalatePageBrokenInput,
-  accessChecker: AccessChecker = requireStoreAccess
+  accessChecker: AccessChecker = requireStoreAccess,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalatePageBrokenOutput> {
 
   // Page-broken issues always require TS to debug the live store. Surface
   // access requirement before collecting other info.
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+  const homepageProvidedByCustomer = urlAppearsInMessages(input.customer_homepage_url, customerTexts);
+
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text,
-    input.customer_homepage_url
+    input.customer_homepage_url,
+    homepageProvidedByCustomer
   );
   if (!access.ready) {
     return {
@@ -97,11 +108,36 @@ async function escalatePageBrokenIssueHandler(
     } as EscalatePageBrokenOutput;
   }
 
-  const validEditors = filterValidUrls(input.editor_links);
+  const sentEditors = filterValidUrls(input.editor_links).filter((e) => urlAppearsInMessages(e, customerTexts));
+  const validEditors = sentEditors.filter((e) => isEditorLink(e));
+
+  // The customer pasted a link for the editor slot, but it is not a PageFly
+  // editor link (e.g. a homepage). Ask again with the editor-link guide image.
+  if (validEditors.length === 0 && sentEditors.length > 0) {
+    return {
+      issue_summary: "The link provided is not a PageFly editor link.",
+      is_ready_for_escalation: false,
+      missing_info: ["editor_links"],
+      crisp_note: { content: "", formatted_message: "" },
+      next_step_for_user: await pickWrongEditorLinkMessage(input.customer_last_message_text),
+      note_posted: false,
+      note_post_error:
+        "The customer's link is not a PageFly editor link (wrong type). Hugo must ask for the real editor link; do NOT escalate with a homepage/preview/admin link.",
+    };
+  }
+
+  // Ground publish consent in the customer's REAL messages so Hugo cannot
+  // fabricate it. The boolean from Hugo is only a fallback (used if the
+  // classifier is unavailable) and only "publish"; otherwise we default to
+  // "unknown" so Hugo is forced to actually ask.
+  const consent = await groundPublishConsent(
+    customerTexts,
+    input.user_consented_to_publish === true ? "publish" : undefined
+  );
 
   const missing: MissingField[] = [];
   if (validEditors.length === 0) missing.push("editor_links");
-  if (input.user_consented_to_publish !== true) {
+  if (consent === "unknown") {
     missing.push("user_consented_to_publish");
   }
 
@@ -127,16 +163,14 @@ async function escalatePageBrokenIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_page_broken_issue", validEditors.join(",")),
     fields: {
       issueDescription: issueDescriptionEn,
       editorLinks: validEditors,
-      userConsentedToPublish: input.user_consented_to_publish,
+      userConsentedToPublish: consent === "publish",
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      editorLink: validEditors[0],
-    },
     formatNote: formatPageBrokenNoteContent,
   });
 
@@ -176,3 +210,4 @@ async function escalatePageBrokenIssueHandler(
  ***************************************************************************/
 
 export { escalatePageBrokenIssueHandler, formatPageBrokenNoteContent };
+

@@ -165,3 +165,4 @@ test("shouldForward: reject when self nickname empty (cannot apply loop guard)",
     false
   );
 });
+

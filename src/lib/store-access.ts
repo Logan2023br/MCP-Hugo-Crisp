@@ -2,13 +2,19 @@
  * IMPORTS
  ***************************************************************************/
 
-import { hasVietnameseDiacritics } from "@/lib/escalation-shared.js";
-import { generateCustomerReply, stripSlackBridgePrefix } from "@/lib/anthropic.js";
+import { hasVietnameseDiacritics, classifyPageFlyLink } from "@/lib/escalation-shared.js";
+import {
+  generateCustomerReply,
+  stripSlackBridgePrefix,
+  classifyAccessGranted,
+} from "@/lib/anthropic.js";
 import type { CrispMeta } from "@/lib/crisp.js";
 import {
   readCrispCreds,
   postCrispPrivateNote,
   fetchConversationMeta,
+  fetchConversationMessages,
+  setStoreAccessMeta,
   type CrispCreds,
 } from "@/lib/crisp.js";
 
@@ -31,6 +37,10 @@ const ACCESS_PENDING_WAIT_EN =
  ***************************************************************************/
 
 const LOGAN_OPERATOR_ID = "11c92319-89c1-42be-b4da-2bf5e40568c3";
+
+// Marker appended to the @Logan note so later calls know access was already
+// requested (so we do not re-post @Logan on every customer message).
+const ACCESS_REQUEST_MARKER = "[access-requested]";
 
 const AT_LOGAN_REQUIRED_PERMISSIONS =
   "Home, Products, Customers, Discounts, Content, Online Store, " +
@@ -61,7 +71,7 @@ const AT_LOGAN_NOTE_CONTENT =
 const ENGLISH_ACCESS_INSTRUCTIONS =
   "I need to access your store administration to take a look and just sent a collaborator access request. Minimum permissions are requested. Just enough for us to examine the issue.\n\n" +
   "If you are ok with that, please visit your Shopify Dashboard => Check the notification, and accept the request.\n" +
-  "You will see our request like this: https://drive.google.com/file/d/1dZijbCDVp_F57MG3RArK2-DaItN84hEF/view\n\n" +
+  "You will see our request like this: https://prnt.sc/2064S7B2T0Rv\n\n" +
   "Once you have accepted the request, please leave a message here to let me know and I will assist you right away!";
 
 /**************************************************************************
@@ -148,10 +158,22 @@ function isValidHomepageUrl(value: string | undefined): boolean {
   if (trimmed.length === 0) return false;
   try {
     const u = new URL(trimmed);
-    return u.protocol === "http:" || u.protocol === "https:";
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
   } catch {
     return false;
   }
+  // Must be a storefront/homepage URL — reject editor / preview / admin links
+  // the customer may have pasted into the homepage slot by mistake.
+  return classifyPageFlyLink(trimmed) === "homepage";
+}
+
+// Homepage is only trusted when it is a valid URL AND Hugo confirmed the
+// customer actually provided it (not inferred from the editor link).
+function mustAskHomepage(
+  customerHomepageUrl?: string,
+  homepageProvidedByCustomer?: boolean
+): boolean {
+  return !isValidHomepageUrl(customerHomepageUrl) || homepageProvidedByCustomer !== true;
 }
 
 /**************************************************************************
@@ -174,7 +196,8 @@ type AccessCheckResult =
 async function requireStoreAccess(
   sessionId: string,
   customerLastMessageText?: string,
-  customerHomepageUrl?: string
+  customerHomepageUrl?: string,
+  homepageProvidedByCustomer?: boolean
 ): Promise<AccessCheckResult> {
   if (!sessionId) {
     return {
@@ -212,10 +235,54 @@ async function requireStoreAccess(
     return { ready: true };
   }
 
-  // 2) Access is NOT granted. Before posting the @Logan note, ensure we have
+  // 1b) store_access empty. If we ALREADY posted the @Logan request, do not
+  // re-post it. Instead, check whether the customer has now confirmed they
+  // accepted the access — if so, persist store_access and proceed.
+  const msgs = await fetchConversationMessages(sessionId, creds);
+  const alreadyRequested =
+    !msgs.error &&
+    msgs.messages.some(
+      (m) => typeof m.content === "string" && m.content.includes(ACCESS_REQUEST_MARKER)
+    );
+
+  if (alreadyRequested) {
+    const customerMsgs = msgs.messages
+      .filter((m) => m.from === "user" && m.type === "text" && typeof m.content === "string")
+      .map((m) => m.content as string);
+    const lastCustomerMsg =
+      customerMsgs[customerMsgs.length - 1] ?? customerLastMessageText ?? "";
+
+    const cls = await classifyAccessGranted(lastCustomerMsg);
+    if (cls.ok && cls.granted) {
+      const value = customerHomepageUrl?.trim() || "customer-confirmed";
+      const set = await setStoreAccessMeta(sessionId, creds, value);
+      if (!set.ok) {
+        console.error(
+          `[store-access] session=${sessionId}: setStoreAccessMeta failed: ${set.error}`
+        );
+      }
+      return { ready: true };
+    }
+
+    // Not confirmed yet → re-send the wait message, do NOT re-post @Logan.
+    return {
+      ready: false,
+      output: {
+        is_ready_for_escalation: false,
+        missing_info: ["store_access"],
+        crisp_note: { content: "", formatted_message: "" },
+        next_step_for_user: await pickAccessPendingWaitMessage(
+          lastCustomerMsg || customerLastMessageText
+        ),
+        note_posted: false,
+      },
+    };
+  }
+
+  // 2) First time (no @Logan posted yet). Before posting the @Logan note, ensure we have
   // the customer's homepage URL — Logan needs to know which store to send
   // the access request to. If not provided, ask the customer first.
-  if (!isValidHomepageUrl(customerHomepageUrl)) {
+  if (mustAskHomepage(customerHomepageUrl, homepageProvidedByCustomer)) {
     return {
       ready: false,
       output: {
@@ -246,7 +313,7 @@ async function requestAccessViaLogan(
   customerHomepageUrl: string,
   metaError?: string
 ): Promise<AccessCheckResult> {
-  const noteContent = buildAtLoganNoteContent(customerHomepageUrl);
+  const noteContent = `${buildAtLoganNoteContent(customerHomepageUrl)}\n${ACCESS_REQUEST_MARKER}`;
   const post = await postCrispPrivateNote(sessionId, noteContent, creds, [
     LOGAN_OPERATOR_ID,
   ]);
@@ -279,11 +346,13 @@ export {
   AT_LOGAN_NOTE_CONTENT,
   AT_LOGAN_REQUIRED_PERMISSIONS,
   LOGAN_OPERATOR_ID,
+  ACCESS_REQUEST_MARKER,
   buildAtLoganNoteContent,
   ENGLISH_ACCESS_INSTRUCTIONS,
   ACCESS_ACK_PREFIX,
   hasStoreAccess,
   isValidHomepageUrl,
+  mustAskHomepage,
   pickAccessPendingWaitMessage,
   pickAskHomepageMessage,
   matchAccessAcknowledged,
@@ -291,3 +360,4 @@ export {
   type AccessCheckResult,
   type AccessOutputPartial,
 };
+

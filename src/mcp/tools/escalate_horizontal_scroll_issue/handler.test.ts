@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 /**************************************************************************
  * MISSING-INFO GATE
@@ -19,7 +20,8 @@ test("hscroll: missing editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -33,7 +35,8 @@ test("hscroll: placeholder editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("editor_link"));
 });
@@ -46,7 +49,8 @@ test("hscroll: missing publish_status → missing", async () => {
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("publish_status"));
 });
@@ -59,7 +63,8 @@ test("hscroll: screenshot is OPTIONAL — pass with editor+publish only", async 
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
@@ -73,7 +78,8 @@ test("hscroll: user_exited_editor=false → missing editor_exit", async () => {
       publish_status: "published",
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -88,7 +94,8 @@ test("hscroll: missing-info fallback uses English by default", async () => {
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /publish/);
@@ -103,7 +110,8 @@ test("hscroll: missing-info fallback wraps with Vietnamese when customer chats V
       customer_last_message_text: "Page mình scroll trái phải được trên mobile",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
@@ -187,3 +195,4 @@ test("formatHScrollNoteContent: with URL + attached files", () => {
   );
   assert.match(note, /screenshot: https:\/\/prnt\.sc\/abc \(customer also attached files in ticket\)/);
 });
+

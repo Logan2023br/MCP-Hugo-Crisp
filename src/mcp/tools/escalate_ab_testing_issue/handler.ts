@@ -15,6 +15,9 @@ import {
   pickWaitMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  makeDedupKey,
+  urlAppearsInMessages,
+  fetchCustomerTexts,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireStoreAccess } from "@/lib/store-access.js";
@@ -75,12 +78,17 @@ type AccessChecker = typeof requireStoreAccess;
 
 async function escalateAbTestingIssueHandler(
   input: EscalateAbTestingInput,
-  accessChecker: AccessChecker = requireStoreAccess
+  accessChecker: AccessChecker = requireStoreAccess,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalateAbTestingOutput> {
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+  const homepageProvidedByCustomer = urlAppearsInMessages(input.customer_homepage_url, customerTexts);
+
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text,
-    input.customer_homepage_url
+    input.customer_homepage_url,
+    homepageProvidedByCustomer
   );
   if (!access.ready) {
     return {
@@ -130,6 +138,8 @@ async function escalateAbTestingIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_ab_testing_issue", editorLink ?? ""),
     fields: {
       issueDescription: issueDescriptionEn,
       editorLink,
@@ -137,11 +147,6 @@ async function escalateAbTestingIssueHandler(
       customerAttachedFiles: hasFiles,
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl: validScreenshotUrls[0],
-      editorLink,
-    },
     formatNote: formatAbTestingNoteContent,
   });
 

@@ -6,6 +6,8 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+// GTM success-path tests pass no editor/screenshot URLs, so this can be empty.
+const stubTexts = async () => [] as string[];
 
 test("gtm: minimal happy path — only description + exited editor", async () => {
   const out = await escalateGtmIssueHandler(
@@ -13,7 +15,8 @@ test("gtm: minimal happy path — only description + exited editor", async () =>
       issue_description: "Customer wants to track Buy Now button via GTM",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
   assert.equal(out.missing_info.length, 0);
@@ -25,7 +28,8 @@ test("gtm: user_exited_editor=false → missing editor_exit", async () => {
       issue_description: "GTM tracking on PageFly page",
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -48,7 +52,8 @@ test("gtm: editor_link OPTIONAL — handler does not require it", async () => {
       issue_description: "GTM tracking question",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
 });
@@ -59,7 +64,8 @@ test("gtm: screenshot OPTIONAL — handler does not require it", async () => {
       issue_description: "GTM tracking question",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
 });

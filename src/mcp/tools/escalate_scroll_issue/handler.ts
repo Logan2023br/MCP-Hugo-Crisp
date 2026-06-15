@@ -10,8 +10,12 @@ import {
   looksLikePlaceholder,
   pickMissingInfoMessage,
   pickWaitMessage,
+  pickWrongEditorLinkMessage,
+  validateEditorLink,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  makeDedupKey,
+  fetchCustomerTexts,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireEditorExit } from "@/lib/editor-exit.js";
@@ -49,8 +53,11 @@ function formatNoteContent(fields: NoteFields, ticketUrl: string): string {
  ***************************************************************************/
 
 async function escalateScrollIssueHandler(
-  input: EscalateScrollInput
+  input: EscalateScrollInput,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalateScrollOutput> {
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+
   // Editor-exit gate FIRST. From Hugo's conversation perspective,
   // asking the customer to exit the editor happens BEFORE the access
   // flow — if TS is about to request collaborator access, the customer
@@ -70,17 +77,30 @@ async function escalateScrollIssueHandler(
 
   const missing: MissingField[] = [];
 
+  const editorStatus = validateEditorLink(input.editor_link, customerTexts);
+  if (editorStatus === "wrong_type") {
+    return {
+      issue_summary: "The link provided is not a PageFly editor link.",
+      is_ready_for_escalation: false,
+      missing_info: ["editor_link"],
+      crisp_note: { content: "", formatted_message: "" },
+      next_step_for_user: await pickWrongEditorLinkMessage(input.customer_last_message_text),
+      note_posted: false,
+      note_post_error:
+        "The customer's link is not a PageFly editor link (wrong type). Hugo must ask for the real editor link; do NOT escalate with a homepage/preview/admin link.",
+    };
+  }
+  if (editorStatus === "missing") {
+    missing.push("editor_link");
+  }
+
   if (!input.screenshot_url) missing.push("screenshot");
-  if (!input.editor_link) missing.push("editor_link");
 
   // Reject obvious placeholders / fabricated URLs. Hugo sometimes invents
   // values like "YOUR_STORE", "PAGE_ID", "dummyimage.com" to satisfy the
   // schema instead of asking the user. Treat these as "missing".
   if (input.screenshot_url && looksLikePlaceholder(input.screenshot_url)) {
     if (!missing.includes("screenshot")) missing.push("screenshot");
-  }
-  if (input.editor_link && looksLikePlaceholder(input.editor_link)) {
-    if (!missing.includes("editor_link")) missing.push("editor_link");
   }
 
   if (missing.length > 0) {
@@ -110,17 +130,14 @@ async function escalateScrollIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_scroll_issue", editorLink),
     fields: {
       issueDescription: issueDescriptionEn,
       screenshotUrl,
       editorLink,
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl,
-      editorLink,
-    },
     formatNote: formatNoteContent,
   });
   if (noteResult.posted) {
@@ -158,4 +175,4 @@ async function escalateScrollIssueHandler(
  * EXPORTS
  ***************************************************************************/
 
-export { escalateScrollIssueHandler };
+export { escalateScrollIssueHandler, formatNoteContent };

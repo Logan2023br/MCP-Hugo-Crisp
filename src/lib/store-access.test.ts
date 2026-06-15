@@ -8,6 +8,7 @@ import {
   AT_LOGAN_NOTE_CONTENT,
   ENGLISH_ACCESS_INSTRUCTIONS,
   matchAccessAcknowledged,
+  mustAskHomepage,
 } from "./store-access.ts";
 
 test("hasStoreAccess: non-empty URL string => true", () => {
@@ -66,10 +67,10 @@ test("AT_LOGAN_NOTE_CONTENT mentions Logan and the standard permissions list", (
   assert.match(AT_LOGAN_NOTE_CONTENT, /Manage and install apps and channels/);
 });
 
-test("ENGLISH_ACCESS_INSTRUCTIONS contains the Drive screenshot link", () => {
+test("ENGLISH_ACCESS_INSTRUCTIONS contains the screenshot link", () => {
   assert.match(
     ENGLISH_ACCESS_INSTRUCTIONS,
-    /https:\/\/drive\.google\.com\/file\/d\/1dZijbCDVp_F57MG3RArK2-DaItN84hEF\/view/
+    /https:\/\/prnt\.sc\/2064S7B2T0Rv/
   );
 });
 
@@ -102,3 +103,21 @@ test("matchAccessAcknowledged: empty / undefined => false", () => {
   assert.equal(matchAccessAcknowledged(""), false);
   assert.equal(matchAccessAcknowledged(undefined), false);
 });
+
+test("mustAskHomepage: valid url + flag true => false (do not ask)", () => {
+  assert.equal(mustAskHomepage("https://shop.com", true), false);
+});
+
+test("mustAskHomepage: valid url + flag false => true (ask)", () => {
+  assert.equal(mustAskHomepage("https://shop.com", false), true);
+});
+
+test("mustAskHomepage: valid url + flag undefined => true (ask)", () => {
+  assert.equal(mustAskHomepage("https://shop.com", undefined), true);
+});
+
+test("mustAskHomepage: no url + flag true => true (ask)", () => {
+  assert.equal(mustAskHomepage(undefined, true), true);
+  assert.equal(mustAskHomepage("not-a-url", true), true);
+});
+

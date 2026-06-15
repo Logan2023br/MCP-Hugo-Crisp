@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 test("live-different-editor: missing editor_link → missing", async () => {
   const out = await escalateLiveDifferentEditorIssueHandler(
@@ -16,7 +17,8 @@ test("live-different-editor: missing editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -31,7 +33,8 @@ test("live-different-editor: missing live_preview_url → missing", async () => 
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("live_preview_url"));
 });
@@ -45,7 +48,8 @@ test("live-different-editor: placeholder live_preview_url → missing", async ()
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("live_preview_url"));
 });
@@ -59,7 +63,8 @@ test("live-different-editor: missing publish_status → missing", async () => {
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("publish_status"));
 });
@@ -73,7 +78,8 @@ test("live-different-editor: screenshot is OPTIONAL — pass with editor+live+pu
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
@@ -88,7 +94,8 @@ test("live-different-editor: user_exited_editor=false → missing editor_exit", 
       publish_status: "published",
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -104,7 +111,8 @@ test("live-different-editor: missing-info fallback uses English by default", asy
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /live URL/);
@@ -121,7 +129,8 @@ test("live-different-editor: missing-info fallback wraps with Vietnamese when cu
       customer_last_message_text: "Live của mình khác với editor",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });

@@ -70,6 +70,8 @@ import { registerEscalateScrollBarIssueTool } from "@/mcp/tools/escalate_scroll_
 import { registerEscalateImageHeaderTabIssueTool } from "@/mcp/tools/escalate_image_header_tab_issue/main.js";
 import { registerEscalateDynamicButtonIssueTool } from "@/mcp/tools/escalate_dynamic_button_issue/main.js";
 import { registerEscalateFontIssueTool } from "@/mcp/tools/escalate_font_issue/main.js";
+import { registerSubmitAdditionalRequestTool } from "@/mcp/tools/submit_additional_request/main.js";
+import { registerHandleIssueFollowupTool } from "@/mcp/tools/handle_issue_followup/main.js";
 
 /**************************************************************************
  * MAIN
@@ -143,6 +145,8 @@ function registerTools(server: McpServer): void {
   registerEscalateImageHeaderTabIssueTool(server);
   registerEscalateDynamicButtonIssueTool(server);
   registerEscalateFontIssueTool(server);
+  registerSubmitAdditionalRequestTool(server);
+  registerHandleIssueFollowupTool(server);
 }
 
 /**************************************************************************

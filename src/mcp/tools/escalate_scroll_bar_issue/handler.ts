@@ -7,6 +7,12 @@ import type {
   EscalateScrollBarOutput,
 } from "@/mcp/tools/escalate_scroll_bar_issue/shapes.js";
 import {
+  fetchCustomerTexts,
+  urlAppearsInMessages,
+  makeDedupKey,
+  validateEditorLink,
+  pickWrongEditorLinkMessage,
+  groundPublishConsent,
   filterValidUrls,
   formatReferenceMedia,
   hasAnyReferenceMedia,
@@ -78,12 +84,17 @@ type AccessChecker = typeof requireStoreAccess;
 
 async function escalateScrollBarIssueHandler(
   input: EscalateScrollBarInput,
-  accessChecker: AccessChecker = requireStoreAccess
+  accessChecker: AccessChecker = requireStoreAccess,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalateScrollBarOutput> {
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+  const homepageProvidedByCustomer = urlAppearsInMessages(input.customer_homepage_url, customerTexts);
+
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text,
-    input.customer_homepage_url
+    input.customer_homepage_url,
+    homepageProvidedByCustomer
   );
   if (!access.ready) {
     return {
@@ -108,7 +119,20 @@ async function escalateScrollBarIssueHandler(
 
   const missing: MissingField[] = [];
 
-  if (!input.editor_link || looksLikePlaceholder(input.editor_link)) {
+  const editorStatus = validateEditorLink(input.editor_link, customerTexts);
+  if (editorStatus === "wrong_type") {
+    return {
+      issue_summary: "The link provided is not a PageFly editor link.",
+      is_ready_for_escalation: false,
+      missing_info: ["editor_link"],
+      crisp_note: { content: "", formatted_message: "" },
+      next_step_for_user: await pickWrongEditorLinkMessage(input.customer_last_message_text),
+      note_posted: false,
+      note_post_error:
+        "The customer's link is not a PageFly editor link (wrong type). Hugo must ask for the real editor link; do NOT escalate with a homepage/preview/admin link.",
+    };
+  }
+  if (editorStatus === "missing") {
     missing.push("editor_link");
   }
   if (
@@ -119,10 +143,12 @@ async function escalateScrollBarIssueHandler(
   ) {
     missing.push("screenshot");
   }
-  if (
-    input.publish_status !== "published" &&
-    input.publish_status !== "only_save"
-  ) {
+  const consent = await groundPublishConsent(
+    customerTexts,
+    input.publish_status === "published" ? "publish"
+      : input.publish_status === "only_save" ? "save" : undefined
+  );
+  if (consent === "unknown") {
     missing.push("publish_status");
   }
 
@@ -151,19 +177,16 @@ async function escalateScrollBarIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_scroll_bar_issue", editorLink),
     fields: {
       issueDescription: issueDescriptionEn,
       editorLink,
       screenshotUrls: validScreenshotUrls,
       customerAttachedFiles: hasFiles,
-      publishStatus: input.publish_status,
+      publishStatus: consent === "publish" ? "published" : "only_save",
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl: validScreenshotUrls[0],
-      editorLink,
-    },
     formatNote: formatScrollBarNoteContent,
   });
 

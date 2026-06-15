@@ -2,6 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { escalateAppsIssueHandler } from "./handler.ts";
 
+// urlAppearsInMessages does a substring match against the customer's real chat
+// messages, so every editor URL a success/gate test relies on must appear here.
+const stubTexts = async () => [
+  "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+];
+
 test("apps handler: missing editor_links → missing_info includes editor_links", async () => {
   const out = await escalateAppsIssueHandler({
     issue_description: "App bundle không show",
@@ -9,7 +15,7 @@ test("apps handler: missing editor_links → missing_info includes editor_links"
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_links"));
   assert.equal(out.note_posted, false);
@@ -23,7 +29,7 @@ test("apps handler: empty editor_links array → missing", async () => {
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("editor_links"));
 });
 
@@ -37,7 +43,7 @@ test("apps handler: all editor_links are placeholders → missing", async () => 
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("editor_links"));
 });
 
@@ -48,7 +54,7 @@ test("apps handler: missing media_urls → missing", async () => {
     media_urls: undefined as unknown as string[],
     publish_status: "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("media_urls"));
 });
 
@@ -59,7 +65,7 @@ test("apps handler: empty media_urls array → missing", async () => {
     media_urls: [],
     publish_status: "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("media_urls"));
 });
 
@@ -70,7 +76,7 @@ test("apps handler: all media_urls are placeholders → missing", async () => {
     media_urls: ["https://dummyimage.com/600x400", "https://example.com/img.png"],
     publish_status: "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("media_urls"));
 });
 
@@ -81,7 +87,7 @@ test("apps handler: missing publish_status → missing", async () => {
     media_urls: ["https://prnt.sc/abc"],
     publish_status: undefined as unknown as "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("publish_status"));
 });
 
@@ -92,7 +98,7 @@ test("apps handler: multiple fields missing → all in missing_info", async () =
     media_urls: [],
     publish_status: undefined as unknown as "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   assert.ok(out.missing_info.includes("editor_links"));
   assert.ok(out.missing_info.includes("media_urls"));
   assert.ok(out.missing_info.includes("publish_status"));
@@ -105,7 +111,7 @@ test("apps handler: missing-info fallback uses English when no customer text + n
     media_urls: [],
     publish_status: undefined as unknown as "published",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   // No customer_last_message_text + tests run without ANTHROPIC_API_KEY →
   // helper falls through to English template.
   assert.match(out.next_step_for_user, /the editor link/);
@@ -121,7 +127,7 @@ test("apps handler: missing-info fallback uses Vietnamese when customer chats Vi
     publish_status: undefined as unknown as "published",
     customer_last_message_text: "Mình bị lỗi app không hiển thị",
     user_exited_editor: true,
-  });
+  }, stubTexts);
   // Tests run without ANTHROPIC_API_KEY → falls back to VI heuristic.
   // English labels are passed in; fallback wraps them in Vietnamese template.
   assert.match(out.next_step_for_user, /the editor link/);
@@ -139,7 +145,7 @@ test("apps handler: user_exited_editor=false → missing editor_exit", async () 
     media_urls: ["https://prnt.sc/abc"],
     publish_status: "published",
     user_exited_editor: false,
-  });
+  }, stubTexts);
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
   assert.equal(out.note_posted, false);

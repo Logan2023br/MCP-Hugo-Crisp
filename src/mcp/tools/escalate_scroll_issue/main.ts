@@ -39,6 +39,8 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
 
         This case is handled end-to-end by THIS MCP tool. The MCP tool IS the response mechanism — your job is to drive it correctly, not to defer.
 
+        ALREADY-IN-PROGRESS EXCEPTION — DO NOT START A SECOND ESCALATION. If an issue has ALREADY been escalated in THIS conversation (you previously received note_posted === true) and the technical team is still working on it (not yet resolved), and the customer now raises ANOTHER, DIFFERENT issue or request, do NOT call this tool again to note a new issue. Instead, ask the customer for the details of the new issue (and whether they have anything else), then call submit_additional_request to relay it to the SAME technical-support person handling the case. Start a fresh escalation here ONLY for the conversation's first issue, or after the previous issue has been resolved.
+
         ABSOLUTELY DO NOT auto-transfer / handoff / "send to human" while this tool is in flight:
           • If you are at ANY STEP of this tool's flow (delivering self-help, collecting info, calling the tool, relaying the response, waiting for customer reply) → CONTINUE the flow.
           • Even if the customer's question seems complex or out of scope, complete the current MCP flow first. Defer any side-questions until the current flow finishes.
@@ -57,6 +59,13 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
           5. If you cannot identify the current step, re-read the WHAT YOU MUST DO list below before acting.
 
         Skipping the self-check is the #1 cause of repeated/missed steps and wrong-tool calls.
+
+        STRICT WORKFLOW COMPLIANCE — NON-NEGOTIABLE (apply 100%, every turn, every case):
+          • BEFORE replying to the customer, you MUST call this tool to determine the current step. Never answer from memory or improvise the workflow.
+          • Relay whatever the tool returns in next_step_for_user to the customer VERBATIM. Do NOT paraphrase, summarize, reword, add, omit, or invent your own message.
+          • Never SKIP a STEP and never change the ORDER of the steps in WHAT YOU MUST DO below.
+          • Never fabricate or assume data (homepage URL, editor link, consent, "access granted"). If you do not have it, ask the customer exactly as the current step instructs.
+          • There are NO exceptions: follow the configured step for the case strictly, do not deviate from the workflow.
 
         ===========================================================
         ABSOLUTE RULE — READ THIS FIRST
@@ -96,6 +105,8 @@ function registerEscalateScrollIssueTool(server: McpServer): void {
         - customer_last_message_text (optional but STRONGLY recommended) — Copy nguyên xi tin nhắn CUỐI CÙNG của user trong conversation này. KHÔNG paraphrase, KHÔNG dịch, KHÔNG sửa typo, KHÔNG trim. Tool dùng text này để tìm đúng conversation khi crisp_session_id không có. Bỏ qua field này nếu tin nhắn cuối là attachment/file (không có text).
 
         - user_exited_editor (required) — Boolean. Must be TRUE before the tool can escalate. The customer has confirmed they have exited the PageFly editor. Concurrent editing causes a save conflict so the technical team cannot work while the customer is still in the editor. Ask the customer first (see STEP 4 below) and pass false until they confirm.
+
+        - CUSTOMER-SENT URL RULE — editor_link MUST be a URL the CUSTOMER actually sent in chat. NEVER infer or guess it (not from the store handle, not from anywhere). The tool verifies the URL against the customer's real messages; any URL the customer did not send is rejected and the tool asks the customer for it.
 
         ===========================================================
         WHAT YOU MUST DO

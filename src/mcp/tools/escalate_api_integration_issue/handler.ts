@@ -10,6 +10,7 @@ import {
   pickWaitMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  makeDedupKey,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 
@@ -45,13 +46,12 @@ async function escalateApiIntegrationIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_api_integration_issue", input.crisp_session_id ?? ""),
     fields: {
       issueDescription: issueDescriptionEn,
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-    },
     formatNote: formatApiIntegrationNoteContent,
   });
 

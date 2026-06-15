@@ -37,10 +37,12 @@ app.get("/health", (_req, res) => {
   res.status(200).send("OK");
 });
 
-// Inject Crisp session_id from request headers into tools/call arguments so
-// escalate_* tools post the note deterministically instead of falling back to
-// hybrid scoring. Crisp's Hugo runtime sends `x-crisp-session-id` on every MCP
-// call but does not surface it to the LLM's tool arguments.
+// Inject Crisp session_id from the request header into tools/call arguments so
+// escalate_* tools post the note deterministically. Crisp's Hugo runtime sends
+// `x-crisp-session-id` on EVERY MCP call; this header is the source of truth and
+// takes precedence over any session_id the LLM may have put in the tool arguments
+// (which can be a stale/placeholder value, e.g. in Review Mode). When the header
+// is absent we keep whatever the caller passed as a fallback.
 function injectCrispSessionId(
   body: unknown,
   headers: Record<string, string | string[] | undefined>
@@ -50,8 +52,6 @@ function injectCrispSessionId(
   if (rpc.method !== "tools/call") return;
   const args = rpc.params?.arguments;
   if (!args) return;
-  // Don't override if the caller already passed one.
-  if (typeof args.crisp_session_id === "string" && args.crisp_session_id.length > 0) return;
   const headerValue = headers["x-crisp-session-id"];
   const sessionId = Array.isArray(headerValue) ? headerValue[0] : headerValue;
   if (typeof sessionId === "string" && sessionId.length > 0) {
@@ -112,3 +112,4 @@ const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 app.listen(port, () => {
   console.log(`Demo MCP Server running on http://localhost:${port}/mcp`);
 });
+

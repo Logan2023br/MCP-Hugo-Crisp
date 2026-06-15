@@ -17,7 +17,7 @@ test("partner: wait message comes back English by default (no Claude key)", asyn
   const out = await escalatePartnerIssueHandler({
     issue_description: "Customer wants to integrate their app with PageFly",
   });
-  assert.match(out.next_step_for_user, /Thank you|technical team/i);
+  assert.match(out.next_step_for_user, /Thanks for sharing|update soon/i);
 });
 
 test("partner: wait message comes back Vietnamese when customer chats VI (no Claude key)", async () => {

@@ -38,3 +38,4 @@ test("verifyHmacSignature: uses constant-time compare (different lengths don't c
   // Should not throw; should return false.
   assert.equal(verifyHmacSignature(body, "short", SECRET), false);
 });
+

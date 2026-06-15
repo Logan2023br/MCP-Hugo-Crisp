@@ -14,6 +14,9 @@ import {
   pickWaitMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  fetchCustomerTexts,
+  urlAppearsInMessages,
+  makeDedupKey,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireStoreAccess } from "@/lib/store-access.js";
@@ -68,12 +71,17 @@ type AccessChecker = typeof requireStoreAccess;
 
 async function escalatePageflyAnalyticsIssueHandler(
   input: EscalatePageflyAnalyticsInput,
-  accessChecker: AccessChecker = requireStoreAccess
+  accessChecker: AccessChecker = requireStoreAccess,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalatePageflyAnalyticsOutput> {
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+  const homepageProvidedByCustomer = urlAppearsInMessages(input.customer_homepage_url, customerTexts);
+
   const access = await accessChecker(
     input.crisp_session_id ?? "",
     input.customer_last_message_text,
-    input.customer_homepage_url
+    input.customer_homepage_url,
+    homepageProvidedByCustomer
   );
   if (!access.ready) {
     return {
@@ -117,16 +125,14 @@ async function escalatePageflyAnalyticsIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_pagefly_analytics_issue", input.crisp_session_id ?? ""),
     fields: {
       issueDescription: issueDescriptionEn,
       screenshotUrls: validScreenshotUrls,
       customerAttachedFiles: hasFiles,
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl: validScreenshotUrls[0],
-    },
     formatNote: formatPageflyAnalyticsNoteContent,
   });
 

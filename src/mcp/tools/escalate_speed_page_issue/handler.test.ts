@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 test("speed-page: missing editor_link → missing", async () => {
   const out = await escalateSpeedPageIssueHandler(
@@ -15,7 +16,8 @@ test("speed-page: missing editor_link → missing", async () => {
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -29,7 +31,8 @@ test("speed-page: placeholder editor_link → missing", async () => {
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("editor_link"));
 });
@@ -42,7 +45,8 @@ test("speed-page: user_consented_to_publish false → missing consent", async ()
       user_consented_to_publish: false,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("user_consented_to_publish"));
 });
@@ -55,7 +59,8 @@ test("speed-page: screenshot is OPTIONAL — pass with editor+consent only", asy
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
@@ -69,7 +74,8 @@ test("speed-page: user_exited_editor=false → missing editor_exit", async () =>
       user_consented_to_publish: true,
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -84,7 +90,8 @@ test("speed-page: missing-info fallback English default", async () => {
       user_consented_to_publish: false,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /permission to publish/);
@@ -99,7 +106,8 @@ test("speed-page: missing-info fallback Vietnamese wrapper when customer chats V
       customer_last_message_text: "Page của mình load chậm quá",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
@@ -174,3 +182,4 @@ test("formatSpeedPageNoteContent: URL + attached files", () => {
   );
   assert.match(note, /screenshot: https:\/\/pagespeed\.web\.dev\/x \(customer also attached files in ticket\)/);
 });
+

@@ -6,6 +6,12 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+// urlAppearsInMessages substring-matches the customer's real chat messages.
+// api-feature keeps its own conditional editor logic (placeholder-based, not
+// text-verified), so this is included for completeness of the success paths.
+const stubTexts = async () => [
+  "https://admin.shopify.com/store/x/apps/pagefly/editor/abc",
+];
 
 test("api-feature: api_translation missing editor_link → missing", async () => {
   const out = await escalateApiFeatureIssueHandler(
@@ -17,7 +23,8 @@ test("api-feature: api_translation missing editor_link → missing", async () =>
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -33,7 +40,8 @@ test("api-feature: ai_credit missing publish_status → missing", async () => {
       publish_status: undefined,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("publish_status"));
 });
@@ -47,7 +55,8 @@ test("api-feature: ai_credit_refund missing screenshot → missing", async () =>
       publish_status: "only_save",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("screenshot"));
 });
@@ -62,7 +71,8 @@ test("api-feature: api_translation user_exited_editor=false → missing editor_e
       publish_status: "published",
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -75,7 +85,8 @@ test("api-feature: smart_page does NOT require editor_link / publish / editor_ex
       feature_type: "smart_page",
       screenshot_urls: ["https://prnt.sc/abc"],
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
   assert.equal(out.missing_info.length, 0);
@@ -87,7 +98,8 @@ test("api-feature: smart_page STILL requires screenshot", async () => {
       issue_description: "Smart Page broken",
       feature_type: "smart_page",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["screenshot"]);
@@ -100,7 +112,8 @@ test("api-feature: customer_attached_files=true alone satisfies screenshot (smar
       feature_type: "smart_page",
       customer_attached_files: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
 });
@@ -114,7 +127,8 @@ test("api-feature: missing-info fallback uses English by default", async () => {
       publish_status: undefined,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /publish/);

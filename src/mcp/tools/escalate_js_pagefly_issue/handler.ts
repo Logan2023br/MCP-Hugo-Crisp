@@ -15,6 +15,7 @@ import {
   pickWaitMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  makeDedupKey,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 
@@ -110,6 +111,8 @@ async function escalateJsPageflyIssueHandler(
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_js_pagefly_issue", liveUrl),
     fields: {
       issueDescription: issueDescriptionEn,
       liveUrl,
@@ -117,10 +120,6 @@ async function escalateJsPageflyIssueHandler(
       customerAttachedFiles: hasFiles,
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs: {
-      customerLastMessageText: input.customer_last_message_text,
-      screenshotUrl: validScreenshotUrls[0],
-    },
     formatNote: formatJsPageflyNoteContent,
   });
 

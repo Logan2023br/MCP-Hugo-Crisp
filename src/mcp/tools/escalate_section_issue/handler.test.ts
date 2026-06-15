@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 /**************************************************************************
  * MISSING-INFO GATE
@@ -19,7 +20,8 @@ test("section: missing editor_link → missing", async () => {
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -35,7 +37,8 @@ test("section: placeholder editor_link → missing", async () => {
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("editor_link"));
 });
@@ -48,7 +51,8 @@ test("section: user_consented_to_publish false → missing consent", async () =>
       user_consented_to_publish: false,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("user_consented_to_publish"));
 });
@@ -64,7 +68,8 @@ test("section: reference media is OPTIONAL — pass with editor+consent only", a
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   // Access stubbed → not blocked there. Missing info should be empty.
   assert.equal(out.missing_info.length, 0);
@@ -79,7 +84,8 @@ test("section: missing-info fallback uses English by default", async () => {
       user_consented_to_publish: false,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /permission to publish/);
@@ -94,7 +100,8 @@ test("section: missing-info fallback wraps with Vietnamese when customer chats V
       customer_last_message_text: "Section của mình bị trắng và load hoài",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
@@ -111,7 +118,8 @@ test("section: user_exited_editor=false → missing editor_exit", async () => {
       user_consented_to_publish: true,
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -193,3 +201,4 @@ test("formatSectionNoteContent: with URL + attached files", () => {
   );
   assert.match(note, /reference: https:\/\/prnt\.sc\/err \(customer also attached files in ticket\)/);
 });
+

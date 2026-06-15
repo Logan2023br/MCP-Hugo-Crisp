@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 test("product-show: missing editor_link → missing", async () => {
   const out = await escalateProductShowIssueHandler(
@@ -16,7 +17,8 @@ test("product-show: missing editor_link → missing", async () => {
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -31,7 +33,8 @@ test("product-show: placeholder editor_link → missing", async () => {
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("editor_link"));
 });
@@ -44,7 +47,8 @@ test("product-show: no screenshot URL AND no attached file → missing screensho
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("screenshot"));
@@ -59,7 +63,8 @@ test("product-show: user_consented_to_publish=false → missing consent", async 
       user_consented_to_publish: false,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("user_consented_to_publish"));
 });
@@ -73,7 +78,8 @@ test("product-show: customer_attached_files=true alone satisfies screenshot", as
       user_consented_to_publish: true,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
@@ -88,7 +94,8 @@ test("product-show: user_exited_editor=false → missing editor_exit", async () 
       user_consented_to_publish: true,
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -103,7 +110,8 @@ test("product-show: missing-info fallback uses English by default", async () => 
       user_consented_to_publish: false,
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /permission to publish/);
@@ -118,7 +126,8 @@ test("product-show: missing-info fallback wraps with Vietnamese when customer ch
       customer_last_message_text: "product không show trên live",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });

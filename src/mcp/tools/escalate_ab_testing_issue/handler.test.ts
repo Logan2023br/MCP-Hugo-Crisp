@@ -6,13 +6,18 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+// urlAppearsInMessages substring-matches the customer's real chat messages.
+// ab-testing's editor link is OPTIONAL and not verified against texts, but we
+// include the screenshot URL the success tests use for completeness.
+const stubTexts = async () => ["https://prnt.sc/abc"];
 
 test("ab-testing: no screenshot URL AND no attached file → missing screenshot", async () => {
   const out = await escalateAbTestingIssueHandler(
     {
       issue_description: "AB testing shows no data",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("screenshot"));
@@ -24,7 +29,8 @@ test("ab-testing: customer_attached_files=true alone satisfies screenshot", asyn
       issue_description: "AB testing shows no data",
       customer_attached_files: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
 });
@@ -35,7 +41,8 @@ test("ab-testing: screenshot URL alone satisfies screenshot", async () => {
       issue_description: "AB testing shows no data",
       screenshot_urls: ["https://prnt.sc/abc"],
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
 });
@@ -46,7 +53,8 @@ test("ab-testing: editor_link is OPTIONAL — escalates without it", async () =>
       issue_description: "AB testing data mismatch",
       screenshot_urls: ["https://prnt.sc/abc"],
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
   assert.equal(out.missing_info.length, 0);
@@ -57,7 +65,8 @@ test("ab-testing: missing-info fallback uses English by default", async () => {
     {
       issue_description: "AB Testing broken",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /A\/B Testing/);
 });
@@ -68,7 +77,8 @@ test("ab-testing: missing-info fallback wraps with Vietnamese when customer chat
       issue_description: "AB Testing broken",
       customer_last_message_text: "AB testing không hiện data",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });

@@ -3,7 +3,6 @@
  ***************************************************************************/
 
 import crypto from "node:crypto";
-import { type ConversationLite } from "@/lib/scoring.js";
 
 interface CrispCreds {
   websiteId: string;
@@ -16,13 +15,6 @@ interface NoteUser {
   nickname: string;
   avatar: string;
 }
-
-interface FetchListResult {
-  conversations: ConversationLite[];
-  error?: string;
-}
-
-const HUGO_INBOX_FILTER = "_internal:agent";
 
 /**************************************************************************
  * CREDENTIAL READERS
@@ -84,6 +76,9 @@ async function postCrispPrivateNote(
     from: "operator",
     origin: "chat",
     content,
+    // Mark as bot-originated so Crisp does NOT treat this as a human operator
+    // takeover (which would move the conversation out of the automated box).
+    automated: true,
   };
   if (noteUser) body.user = noteUser;
   if (mentions && mentions.length > 0) body.mentions = mentions;
@@ -127,6 +122,9 @@ async function postCrispText(
     from: "operator",
     origin: "chat",
     content,
+    // Mark as bot-originated so Crisp does NOT treat this as a human operator
+    // takeover (which would move the conversation out of the automated box).
+    automated: true,
   };
   if (noteUser) body.user = noteUser;
 
@@ -153,34 +151,6 @@ async function postCrispText(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Network/exception: ${message}` };
-  }
-}
-
-async function fetchHugoConversations(creds: CrispCreds): Promise<FetchListResult> {
-  const url =
-    `https://api.crisp.chat/v1/website/${creds.websiteId}/conversations/1` +
-    `?filter_inbox_id=${encodeURIComponent(HUGO_INBOX_FILTER)}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "Authorization": buildAuthHeader(creds),
-        "X-Crisp-Tier": "plugin",
-      },
-    });
-    if (!response.ok) {
-      const responseBody = await response.text();
-      return {
-        conversations: [],
-        error: `Crisp list-conversations ${response.status}: ${responseBody.slice(0, 300)}`,
-      };
-    }
-    const json = (await response.json()) as { data?: unknown };
-    const items = Array.isArray(json.data) ? (json.data as ConversationLite[]) : [];
-    return { conversations: items };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { conversations: [], error: `Network/exception: ${message}` };
   }
 }
 
@@ -231,6 +201,7 @@ interface CrispMeta {
   data?: {
     nickname?: string;
     email?: string;
+    segments?: string[];
     data?: {
       store_access?: unknown;
       store_url?: unknown;
@@ -272,6 +243,81 @@ async function fetchConversationMeta(
   }
 }
 
+// Persist store_access into the conversation's custom data (meta.data.data),
+// matching hasStoreAccess. Used to mark access as granted once the customer
+// confirms they accepted the collaborator request.
+// Patch arbitrary custom-data keys into the conversation (meta.data.data).
+async function patchConversationData(
+  sessionId: string,
+  creds: CrispCreds,
+  data: Record<string, unknown>
+): Promise<{ ok: boolean; error?: string }> {
+  const url = `https://api.crisp.chat/v1/website/${creds.websiteId}/conversation/${sessionId}/meta`;
+  try {
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": buildAuthHeader(creds),
+        "X-Crisp-Tier": "plugin",
+      },
+      body: JSON.stringify({ data }),
+    });
+    if (!response.ok) {
+      const responseBody = await response.text();
+      return { ok: false, error: `Crisp set-meta ${response.status}: ${responseBody.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Network/exception: ${message}` };
+  }
+}
+
+async function setStoreAccessMeta(
+  sessionId: string,
+  creds: CrispCreds,
+  value: string
+): Promise<{ ok: boolean; error?: string }> {
+  return patchConversationData(sessionId, creds, { store_access: value });
+}
+
+// Add a conversation segment (e.g. "dev") without removing existing ones.
+// Segments live at the meta top level (meta.data.segments), not inside the
+// custom-data object, so this PATCHes { segments } directly.
+async function addConversationSegment(
+  sessionId: string,
+  creds: CrispCreds,
+  segment: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { meta, error } = await fetchConversationMeta(sessionId, creds);
+  if (error) return { ok: false, error };
+  const existing = Array.isArray(meta?.data?.segments) ? meta!.data!.segments! : [];
+  if (existing.includes(segment)) return { ok: true };
+  const segments = [...existing, segment];
+
+  const url = `https://api.crisp.chat/v1/website/${creds.websiteId}/conversation/${sessionId}/meta`;
+  try {
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": buildAuthHeader(creds),
+        "X-Crisp-Tier": "plugin",
+      },
+      body: JSON.stringify({ segments }),
+    });
+    if (!response.ok) {
+      const responseBody = await response.text();
+      return { ok: false, error: `Crisp set-segments ${response.status}: ${responseBody.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Network/exception: ${message}` };
+  }
+}
+
 /**************************************************************************
  * EXPORTS
  ***************************************************************************/
@@ -282,16 +328,17 @@ export {
   buildAuthHeader,
   postCrispPrivateNote,
   postCrispText,
-  fetchHugoConversations,
   fetchConversationMessages,
   fetchConversationMeta,
+  setStoreAccessMeta,
+  addConversationSegment,
+  patchConversationData,
   verifyHmacSignature,
-  HUGO_INBOX_FILTER,
   type CrispCreds,
   type NoteUser,
-  type FetchListResult,
   type CrispMessage,
   type FetchMessagesResult,
   type CrispMeta,
   type FetchMetaResult,
 };
+

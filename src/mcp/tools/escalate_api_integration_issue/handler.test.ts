@@ -19,7 +19,7 @@ test("api-integration: wait message comes back English by default (no Claude key
   const out = await escalateApiIntegrationIssueHandler({
     issue_description: "Customer requests API",
   });
-  assert.match(out.next_step_for_user, /Thank you|technical team/i);
+  assert.match(out.next_step_for_user, /Thanks for sharing|update soon/i);
 });
 
 test("api-integration: wait message comes back Vietnamese when customer chats VI (no Claude key)", async () => {

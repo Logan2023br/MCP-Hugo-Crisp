@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractCustomerTexts } from "./note-forwarder.ts";
+import {
+  extractCustomerTexts,
+  extractConversationHistory,
+  resolveNoteIntent,
+} from "./note-forwarder.ts";
 
 test("extractCustomerTexts: keeps only user text messages, drops operator/notes", () => {
   const result = extractCustomerTexts([
@@ -40,3 +44,57 @@ test("extractCustomerTexts: returns at most 5 messages (most-recent last)", () =
 test("extractCustomerTexts: empty input → empty output", () => {
   assert.deepEqual(extractCustomerTexts([]), []);
 });
+
+test("extractConversationHistory: keeps customer texts + operator texts/notes, maps roles", () => {
+  const result = extractConversationHistory([
+    { from: "user", type: "text", content: "my page is slow" },
+    { from: "operator", type: "note", content: "@Logan please request access" },
+    { from: "operator", type: "text", content: "we're requesting access now" },
+    { from: "user", type: "note", content: "ignored user note" },
+  ]);
+  assert.deepEqual(result, [
+    { role: "customer", text: "my page is slow" },
+    { role: "operator", text: "@Logan please request access" },
+    { role: "operator", text: "we're requesting access now" },
+  ]);
+});
+
+test("extractConversationHistory: drops empty/non-string, caps at 8 most-recent", () => {
+  const many = Array.from({ length: 10 }, (_, i) => ({
+    from: "user",
+    type: "text",
+    content: `m${i + 1}`,
+  }));
+  const result = extractConversationHistory([
+    { from: "user", type: "text", content: "   " },
+    { from: "user", type: "text", content: 5 as unknown as string },
+    ...many,
+  ]);
+  assert.equal(result.length, 8);
+  assert.equal(result[0].text, "m3");
+  assert.equal(result[7].text, "m10");
+});
+
+test("resolveNoteIntent: LLM classifier decision wins (even over keyword)", () => {
+  // classifier understood the note → its intent is used, regardless of keyword
+  assert.equal(
+    resolveNoteIntent({ keywordFallbackMatched: true, classification: { ok: true, intent: "relay" } }),
+    "relay"
+  );
+  assert.equal(
+    resolveNoteIntent({ keywordFallbackMatched: false, classification: { ok: true, intent: "access_instructions" } }),
+    "access_instructions"
+  );
+});
+
+test("resolveNoteIntent: classifier failure => keyword failsafe, else relay", () => {
+  assert.equal(
+    resolveNoteIntent({ keywordFallbackMatched: true, classification: { ok: false } }),
+    "access_instructions"
+  );
+  assert.equal(
+    resolveNoteIntent({ keywordFallbackMatched: false, classification: { ok: false } }),
+    "relay"
+  );
+});
+

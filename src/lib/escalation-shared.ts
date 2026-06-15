@@ -1,13 +1,151 @@
 import {
   readCrispCreds,
   postCrispPrivateNote,
-  fetchHugoConversations,
+  fetchConversationMessages,
+  fetchConversationMeta,
+  patchConversationData,
 } from "@/lib/crisp.js";
 import {
-  findBestSession,
-  type ScoringInputs,
-} from "@/lib/scoring.js";
-import { callClaude, generateCustomerReply } from "@/lib/anthropic.js";
+  callClaude,
+  generateCustomerReply,
+  classifyPublishConsent,
+  type PublishConsent,
+} from "@/lib/anthropic.js";
+
+/**************************************************************************
+ * DEDUP HELPERS — one escalation note per (tool + editor page)
+ ***************************************************************************/
+
+function editorPageId(editorLink: string): string {
+  const trimmed = editorLink.trim();
+  try {
+    const id = new URL(trimmed).searchParams.get("id");
+    if (id && id.length > 0) return id;
+  } catch {
+    // not a URL — fall through to the raw link
+  }
+  return trimmed;
+}
+
+function makeDedupKey(toolName: string, editorLink: string): string {
+  return `${toolName}|${editorPageId(editorLink)}`;
+}
+
+// Dedup state lives in the conversation custom data (meta.data.data), NOT in the
+// visible note. escalated_refs is a newline-joined list of dedup keys.
+function readConversationData(
+  meta: { data?: { data?: unknown } } | undefined
+): Record<string, unknown> {
+  const d = meta?.data?.data;
+  return d && typeof d === "object" ? (d as Record<string, unknown>) : {};
+}
+
+function readEscalatedRefs(data: Record<string, unknown>): string[] {
+  const v = data.escalated_refs;
+  if (typeof v !== "string") return [];
+  return v.split("\n").map((s) => s.trim()).filter(Boolean);
+}
+
+/**************************************************************************
+ * CUSTOMER-SENT URL VERIFICATION — a URL is trusted only when the customer
+ * actually typed it in chat (deterministic; not a Hugo-set flag).
+ ***************************************************************************/
+
+function urlAppearsInMessages(
+  url: string | undefined,
+  customerTexts: string[]
+): boolean {
+  if (!url) return false;
+  const needle = url.trim().toLowerCase().replace(/\/+$/, "");
+  if (!needle) return false;
+  return customerTexts.some(
+    (t) => typeof t === "string" && t.toLowerCase().includes(needle)
+  );
+}
+
+async function fetchCustomerTexts(sessionId: string): Promise<string[]> {
+  const creds = readCrispCreds();
+  if (!creds || !sessionId) return [];
+  const res = await fetchConversationMessages(sessionId, creds);
+  if (res.error) return [];
+  return res.messages
+    .filter((m) => m.from === "user" && m.type === "text" && typeof m.content === "string")
+    .map((m) => m.content as string);
+}
+
+/**************************************************************************
+ * PAGEFLY LINK TYPE — classify a URL by its structure so we accept the RIGHT
+ * KIND of link in each slot (an editor link must really be an editor link,
+ * not a homepage / preview / admin link the customer happened to paste).
+ *
+ * Editor:   https://admin.shopify.com/store/<store>/apps/pagefly/editor?...id=...&type=...
+ * Preview:  https://<store>.myshopify.com/apps/pagefly/preview?id=...
+ * Homepage: the store's storefront root (myshopify.com or a custom domain),
+ *           i.e. any other valid http(s) URL that is not editor/preview/admin.
+ ***************************************************************************/
+
+type PageFlyLinkType = "editor" | "preview" | "homepage" | "admin" | "other";
+
+function classifyPageFlyLink(url: string | undefined): PageFlyLinkType {
+  if (!url || typeof url !== "string") return "other";
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    return "other";
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return "other";
+  const host = u.hostname.toLowerCase();
+  const path = u.pathname.toLowerCase();
+
+  // PageFly editor lives under the Shopify admin app path.
+  if (host === "admin.shopify.com" && path.includes("/apps/pagefly/editor")) {
+    return "editor";
+  }
+  // PageFly live preview path (on the storefront domain).
+  if (path.includes("/apps/pagefly/preview")) {
+    return "preview";
+  }
+  // Any other admin.shopify.com link (not the PageFly editor).
+  if (host === "admin.shopify.com") {
+    return "admin";
+  }
+  // Everything else valid is treated as a storefront / homepage URL.
+  return "homepage";
+}
+
+function isEditorLink(url: string | undefined): boolean {
+  return classifyPageFlyLink(url) === "editor";
+}
+
+// Ground the publish-vs-save decision in the customer's REAL messages so Hugo
+// cannot fabricate consent. Returns the customer's actual answer; "unknown" if
+// they have not answered (the handler must then ask). On classifier failure we
+// fall back to Hugo's hint so an LLM outage does not block every escalation.
+async function groundPublishConsent(
+  customerTexts: string[],
+  hugoHint: PublishConsent | undefined
+): Promise<PublishConsent> {
+  const result = await classifyPublishConsent(customerTexts);
+  if (result.ok && result.consent) {
+    return result.consent;
+  }
+  return hugoHint ?? "unknown";
+}
+
+// Validate a single editor-link slot against the customer's messages AND its
+// structure. "missing" = nothing usable provided; "wrong_type" = the customer
+// sent a URL but it is not an editor link (e.g. a homepage); "ok" = a real
+// editor link the customer actually pasted.
+function validateEditorLink(
+  editorLink: string | undefined,
+  customerTexts: string[]
+): "ok" | "missing" | "wrong_type" {
+  if (!editorLink || looksLikePlaceholder(editorLink) || !urlAppearsInMessages(editorLink, customerTexts)) {
+    return "missing";
+  }
+  return isEditorLink(editorLink) ? "ok" : "wrong_type";
+}
 
 /**************************************************************************
  * CONSTANTS
@@ -19,10 +157,10 @@ import { callClaude, generateCustomerReply } from "@/lib/anthropic.js";
 // resort fallback used when the Claude call fails or no API key is set —
 // the VI/EN heuristic picks one based on diacritics in customer_last_message_text.
 const WAIT_MESSAGE_VI =
-  "Cảm ơn bạn đã cung cấp đầy đủ thông tin nhé 😊 Mình đã chuyển vấn đề này đến team technical để kiểm tra chi tiết. Bạn vui lòng chờ trong vài phút, team sẽ xem xét và phản hồi bạn sớm nhất có thể!";
+  "Cảm ơn bạn đã cung cấp đầy đủ thông tin nhé 😊 Tụi mình đang kiểm tra giúp bạn và sẽ phản hồi ngay tại đây khi có cập nhật!";
 
 const WAIT_MESSAGE_EN =
-  "Thank you for sharing all the details 😊 I've forwarded this to our technical team for a closer look. Please give them a few minutes — they'll review and reply as soon as possible!";
+  "Thanks for sharing all the details 😊 We're looking into this for you now and will reply right here with an update soon!";
 
 const TICKET_URL_FALLBACK = "(unknown — tool was called without ticket_url)";
 
@@ -57,6 +195,9 @@ function fallbackMissingInfoMessage(
 async function pickWaitMessage(
   customerText: string | undefined
 ): Promise<string> {
+  // Generated in the customer's language. The wait_message intent wording is
+  // deliberately neutral (no "forwarded"/"technical team") to avoid tripping
+  // Crisp's transfer-to-support automation.
   const result = await generateCustomerReply({
     intent: "wait_message",
     customerLastMessage: customerText,
@@ -80,6 +221,35 @@ async function pickMissingInfoMessage(
     return result.text.trim();
   }
   return fallbackMissingInfoMessage(customerText, labelsEnglish);
+}
+
+// Shown when the customer sent a link that is NOT a PageFly editor link
+// (e.g. they pasted their homepage). Includes the screenshot guide on where to
+// copy the real editor link. The image URL must be preserved exactly.
+const EDITOR_LINK_GUIDE_IMAGE = "https://prnt.sc/-BMC7cD-5o38";
+
+const WRONG_EDITOR_LINK_VI =
+  `Hình như link bạn gửi chưa phải là link editor của PageFly 😊 Bạn có thể lấy đúng link editor theo hướng dẫn trong ảnh này: ${EDITOR_LINK_GUIDE_IMAGE} — rồi gửi lại giúp mình nhé.`;
+
+const WRONG_EDITOR_LINK_EN =
+  `Hmm, the link you sent doesn't look like a PageFly editor link 😊 You can copy the correct editor link by following this screenshot: ${EDITOR_LINK_GUIDE_IMAGE} — then send it to me, please.`;
+
+function fallbackWrongEditorLinkMessage(customerText: string | undefined): string {
+  return hasVietnameseDiacritics(customerText) ? WRONG_EDITOR_LINK_VI : WRONG_EDITOR_LINK_EN;
+}
+
+async function pickWrongEditorLinkMessage(
+  customerText: string | undefined
+): Promise<string> {
+  const result = await generateCustomerReply({
+    intent: "wrong_editor_link",
+    customerLastMessage: customerText,
+    missingLabelsEn: EDITOR_LINK_GUIDE_IMAGE,
+  });
+  if (result.ok && result.text && result.text.trim().length > 0) {
+    return result.text.trim();
+  }
+  return fallbackWrongEditorLinkMessage(customerText);
 }
 
 // Hugo sometimes ignores the "issue_description must be English" rule in the
@@ -203,24 +373,26 @@ interface SessionMatchInfo {
 interface PostNoteResult {
   posted: boolean;
   error?: string;
+  duplicate?: boolean;
   sessionUsed?: string;
-  sessionSource?: "input" | "scored";
+  sessionSource?: "input";
   match?: SessionMatchInfo;
   noteContent: string;
 }
 
 interface TryPostArgs<TFields> {
   hintedSessionId?: string;
+  dedupKey?: string;
+  customerLastMessageText?: string;
   fields: TFields;
   providedTicketUrl?: string;
-  scoringInputs: ScoringInputs;
   formatNote: (fields: TFields, ticketUrl: string) => string;
 }
 
 async function tryPostNoteWithScoring<TFields>(
   args: TryPostArgs<TFields>
 ): Promise<PostNoteResult> {
-  const { hintedSessionId, fields, providedTicketUrl, scoringInputs, formatNote } = args;
+  const { hintedSessionId, dedupKey, fields, providedTicketUrl, formatNote } = args;
 
   const creds = readCrispCreds();
   if (!creds) {
@@ -232,12 +404,47 @@ async function tryPostNoteWithScoring<TFields>(
     };
   }
 
-  // 1) Hugo truyền session_id → POST thẳng, không cần scoring.
+  // 1) crisp_session_id (injected from the x-crisp-session-id header on every
+  //    Crisp MCP call) → POST the note directly to that conversation.
   if (hintedSessionId) {
     const ticketUrl = providedTicketUrl ?? buildTicketUrl(creds.websiteId, hintedSessionId);
     const noteContent = formatNote(fields, ticketUrl);
+
+    // NOTE: the customer-facing "we've forwarded it, please wait" message is NOT
+    // sent here. The tool returns it in next_step_for_user and the AI agent (Hugo)
+    // relays it — single source, no duplicate. (Previously the tool also posted it
+    // directly, which double-sent the message.)
+
+    // Dedup: one note per (tool + editor page). The dedup state is stored in the
+    // conversation custom data (meta), NOT in the visible note. A failed read does
+    // NOT block escalation (better one extra note than a dropped one).
+    let currentData: Record<string, unknown> = {};
+    let refs: string[] = [];
+    if (dedupKey) {
+      const meta = await fetchConversationMeta(hintedSessionId, creds);
+      currentData = readConversationData(meta.meta);
+      refs = readEscalatedRefs(currentData);
+      if (refs.includes(dedupKey)) {
+        return {
+          posted: false,
+          duplicate: true,
+          sessionUsed: hintedSessionId,
+          sessionSource: "input",
+          noteContent,
+        };
+      }
+    }
+
     const r = await postCrispPrivateNote(hintedSessionId, noteContent, creds);
     if (r.ok) {
+      if (dedupKey) {
+        // Persist the dedup ref in meta (merge with existing data to preserve
+        // other keys like store_access). Best-effort; failure does not block.
+        await patchConversationData(hintedSessionId, creds, {
+          ...currentData,
+          escalated_refs: [...refs, dedupKey].join("\n"),
+        });
+      }
       return {
         posted: true,
         sessionUsed: hintedSessionId,
@@ -254,58 +461,14 @@ async function tryPostNoteWithScoring<TFields>(
     };
   }
 
-  // 2) Auto-resolve qua hybrid scoring.
-  const list = await fetchHugoConversations(creds);
-  if (list.error) {
-    return {
-      posted: false,
-      error: list.error,
-      noteContent: formatNote(fields, providedTicketUrl ?? TICKET_URL_FALLBACK),
-    };
-  }
-  if (list.conversations.length === 0) {
-    return {
-      posted: false,
-      error: "Hugo's inbox không có conversation nào để match.",
-      noteContent: formatNote(fields, providedTicketUrl ?? TICKET_URL_FALLBACK),
-    };
-  }
-
-  const best = findBestSession(list.conversations, scoringInputs);
-  const matchInfo: SessionMatchInfo = {
-    score: best.score,
-    signalsMatched: best.signalsMatched,
-    thresholdMet: best.thresholdMet,
-  };
-
-  if (!best.thresholdMet || !best.sessionId) {
-    return {
-      posted: false,
-      error: `Không tìm thấy conversation đủ tin cậy (top score ${best.score} < threshold 50). Signals: [${best.signalsMatched.join(", ")}]. Hugo nên xin user paste lại link hoặc dev xử tay.`,
-      match: matchInfo,
-      noteContent: formatNote(fields, providedTicketUrl ?? TICKET_URL_FALLBACK),
-    };
-  }
-
-  const ticketUrl = providedTicketUrl ?? buildTicketUrl(creds.websiteId, best.sessionId);
-  const noteContent = formatNote(fields, ticketUrl);
-  const r = await postCrispPrivateNote(best.sessionId, noteContent, creds);
-  if (r.ok) {
-    return {
-      posted: true,
-      sessionUsed: best.sessionId,
-      sessionSource: "scored",
-      match: matchInfo,
-      noteContent,
-    };
-  }
+  // 2) No session_id on the request. Crisp injects `x-crisp-session-id` into
+  //    crisp_session_id on every MCP call, so reaching here means it was absent
+  //    — we cannot resolve the conversation, so do not post.
   return {
     posted: false,
-    error: `Auto-resolved session ${best.sessionId} (score ${best.score}, signals [${best.signalsMatched.join(", ")}]) but POSTing failed: ${r.error}`,
-    sessionUsed: best.sessionId,
-    sessionSource: "scored",
-    match: matchInfo,
-    noteContent,
+    error:
+      "Missing crisp_session_id — Crisp did not provide the conversation session on this MCP request, so the escalation note cannot be posted.",
+    noteContent: formatNote(fields, providedTicketUrl ?? TICKET_URL_FALLBACK),
   };
 }
 
@@ -326,9 +489,21 @@ export {
   pickMissingInfoMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  editorPageId,
+  makeDedupKey,
+  urlAppearsInMessages,
+  fetchCustomerTexts,
+  classifyPageFlyLink,
+  isEditorLink,
+  validateEditorLink,
+  pickWrongEditorLinkMessage,
+  groundPublishConsent,
+  EDITOR_LINK_GUIDE_IMAGE,
   formatReferenceMedia,
   hasAnyReferenceMedia,
+  type PageFlyLinkType,
   type SessionMatchInfo,
   type PostNoteResult,
   type ReferenceMediaInput,
 };
+

@@ -10,8 +10,14 @@ import {
   looksLikePlaceholder,
   pickMissingInfoMessage,
   pickWaitMessage,
+  pickWrongEditorLinkMessage,
   translateIssueToEnglish,
   tryPostNoteWithScoring,
+  makeDedupKey,
+  urlAppearsInMessages,
+  isEditorLink,
+  groundPublishConsent,
+  fetchCustomerTexts,
   type PostNoteResult,
 } from "@/lib/escalation-shared.js";
 import { requireEditorExit } from "@/lib/editor-exit.js";
@@ -73,8 +79,11 @@ function formatAppsNoteContent(fields: AppsNoteFields, ticketUrl: string): strin
  ***************************************************************************/
 
 async function escalateAppsIssueHandler(
-  input: EscalateAppsInput
+  input: EscalateAppsInput,
+  textsFetcher: (sessionId: string) => Promise<string[]> = fetchCustomerTexts
 ): Promise<EscalateAppsOutput> {
+  const customerTexts = await textsFetcher(input.crisp_session_id ?? "");
+
   // Editor-exit gate FIRST. From Hugo's conversation perspective, asking
   // the customer to exit the editor happens BEFORE any other escalation
   // sub-step (access check, info validation) so the technical team can
@@ -92,13 +101,36 @@ async function escalateAppsIssueHandler(
     } as EscalateAppsOutput;
   }
 
-  const validEditors = filterValidUrls(input.editor_links);
+  const sentEditors = filterValidUrls(input.editor_links).filter((e) => urlAppearsInMessages(e, customerTexts));
+  const validEditors = sentEditors.filter((e) => isEditorLink(e));
+
+  // The customer pasted a link for the editor slot, but it is not a PageFly
+  // editor link (e.g. a homepage). Ask again with the editor-link guide image.
+  if (validEditors.length === 0 && sentEditors.length > 0) {
+    return {
+      issue_summary: "The link provided is not a PageFly editor link.",
+      is_ready_for_escalation: false,
+      missing_info: ["editor_links"],
+      crisp_note: { content: "", formatted_message: "" },
+      next_step_for_user: await pickWrongEditorLinkMessage(input.customer_last_message_text),
+      note_posted: false,
+      note_post_error:
+        "The customer's link is not a PageFly editor link (wrong type). Hugo must ask for the real editor link; do NOT escalate with a homepage/preview/admin link.",
+    };
+  }
+
   const validMedia = filterValidUrls(input.media_urls);
+
+  const consent = await groundPublishConsent(
+    customerTexts,
+    input.publish_status === "published" ? "publish"
+      : input.publish_status === "only_save" ? "save" : undefined
+  );
 
   const missing: MissingField[] = [];
   if (validEditors.length === 0) missing.push("editor_links");
   if (validMedia.length === 0) missing.push("media_urls");
-  if (input.publish_status !== "published" && input.publish_status !== "only_save") {
+  if (consent === "unknown") {
     missing.push("publish_status");
   }
 
@@ -116,27 +148,20 @@ async function escalateAppsIssueHandler(
     };
   }
 
-  // Use a representative editor URL + first media URL for hybrid session scoring.
-  // The scoring inputs match what scroll/cart use, just adapted to arrays.
-  const scoringInputs = {
-    customerLastMessageText: input.customer_last_message_text,
-    screenshotUrl: validMedia[0],
-    editorLink: validEditors[0],
-  };
-
   // The note (TS-facing) must always be English. Translate if Hugo passed Vietnamese.
   const issueDescriptionEn = await translateIssueToEnglish(input.issue_description);
 
   const noteResult: PostNoteResult = await tryPostNoteWithScoring({
     hintedSessionId: input.crisp_session_id,
+    customerLastMessageText: input.customer_last_message_text,
+    dedupKey: makeDedupKey("escalate_apps_issue", validEditors.join(",")),
     fields: {
       issueDescription: issueDescriptionEn,
       editorLinks: validEditors,
       mediaUrls: validMedia,
-      publishStatus: input.publish_status,
+      publishStatus: consent === "publish" ? "published" : "only_save",
     },
     providedTicketUrl: input.ticket_url,
-    scoringInputs,
     formatNote: formatAppsNoteContent,
   });
 

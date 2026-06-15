@@ -109,3 +109,4 @@ async function handleCrispWebhook(req: Request, res: Response): Promise<void> {
  ***************************************************************************/
 
 export { shouldForward, handleCrispWebhook };
+

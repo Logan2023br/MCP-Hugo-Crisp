@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 test("popup-error: missing editor_link → missing", async () => {
   const out = await escalatePopupErrorIssueHandler(
@@ -15,7 +16,8 @@ test("popup-error: missing editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -29,7 +31,8 @@ test("popup-error: placeholder editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("editor_link"));
 });
@@ -42,7 +45,8 @@ test("popup-error: missing publish_status → missing", async () => {
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("publish_status"));
 });
@@ -55,7 +59,8 @@ test("popup-error: screenshot is OPTIONAL — pass with editor+publish only", as
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
@@ -69,7 +74,8 @@ test("popup-error: user_exited_editor=false → missing editor_exit", async () =
       publish_status: "published",
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -84,7 +90,8 @@ test("popup-error: missing-info fallback uses English by default", async () => {
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /publish/);
@@ -99,7 +106,8 @@ test("popup-error: missing-info fallback wraps with Vietnamese when customer cha
       customer_last_message_text: "Popup của mình không hoạt động trên live",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });

@@ -258,3 +258,4 @@ test("formatAnimationNoteContent: URL + attached files (mix)", () => {
   );
   assert.match(note, /reference: https:\/\/loom\.com\/share\/abc \(customer also attached files in ticket\)/);
 });
+

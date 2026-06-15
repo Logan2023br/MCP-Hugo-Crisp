@@ -6,13 +6,15 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => [] as string[];
 
 test("pagefly-analytics: no screenshot URL AND no attached file → missing screenshot", async () => {
   const out = await escalatePageflyAnalyticsIssueHandler(
     {
       issue_description: "Analytics shows no data",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("screenshot"));
@@ -24,7 +26,8 @@ test("pagefly-analytics: customer_attached_files=true alone satisfies screenshot
       issue_description: "Analytics shows no data",
       customer_attached_files: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
   assert.equal(out.missing_info.length, 0);
@@ -36,7 +39,8 @@ test("pagefly-analytics: screenshot URL alone satisfies screenshot", async () =>
       issue_description: "Analytics shows no data",
       screenshot_urls: ["https://prnt.sc/abc"],
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, true);
 });
@@ -46,7 +50,8 @@ test("pagefly-analytics: missing-info fallback uses English by default", async (
     {
       issue_description: "Analytics broken",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /PageFly Analytics/);
 });
@@ -57,7 +62,8 @@ test("pagefly-analytics: missing-info fallback wraps with Vietnamese when custom
       issue_description: "Analytics broken",
       customer_last_message_text: "PageFly analytics không hiện dữ liệu",
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });

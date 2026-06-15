@@ -6,6 +6,7 @@ import {
 } from "./handler.ts";
 
 const stubAccessReady = async () => ({ ready: true } as const);
+const stubTexts = async () => ["https://admin.shopify.com/store/x/apps/pagefly/editor/abc"];
 
 test("element-not-show: missing editor_link → missing", async () => {
   const out = await escalateElementNotShowIssueHandler(
@@ -16,7 +17,8 @@ test("element-not-show: missing editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("editor_link"));
@@ -31,7 +33,8 @@ test("element-not-show: placeholder editor_link → missing", async () => {
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("editor_link"));
 });
@@ -44,7 +47,8 @@ test("element-not-show: no screenshot URL AND no attached file → missing scree
       publish_status: "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.ok(out.missing_info.includes("screenshot"));
@@ -59,7 +63,8 @@ test("element-not-show: missing publish_status → missing", async () => {
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.ok(out.missing_info.includes("publish_status"));
 });
@@ -73,7 +78,8 @@ test("element-not-show: customer_attached_files=true alone satisfies screenshot"
       publish_status: "only_save",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.missing_info.length, 0);
   assert.equal(out.is_ready_for_escalation, true);
@@ -88,7 +94,8 @@ test("element-not-show: user_exited_editor=false → missing editor_exit", async
       publish_status: "published",
       user_exited_editor: false,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.equal(out.is_ready_for_escalation, false);
   assert.deepEqual(out.missing_info, ["editor_exit"]);
@@ -103,7 +110,8 @@ test("element-not-show: missing-info fallback uses English by default", async ()
       publish_status: undefined as unknown as "published",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /the editor link/);
   assert.match(out.next_step_for_user, /publish/);
@@ -118,7 +126,8 @@ test("element-not-show: missing-info fallback wraps with Vietnamese when custome
       customer_last_message_text: "image của tôi không hiện trên mobile",
       user_exited_editor: true,
     },
-    stubAccessReady
+    stubAccessReady,
+    stubTexts
   );
   assert.match(out.next_step_for_user, /vui lòng gửi giúp mình/);
 });
